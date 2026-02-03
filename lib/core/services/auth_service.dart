@@ -13,15 +13,25 @@ class AuthService {
   })  : _apiClient = apiClient,
         _storage = storage;
 
+  /// Unwrap the backend response which has format: {success: bool, data: {...}}
+  Map<String, dynamic> _unwrapResponse(Map<String, dynamic> response) {
+    if (response['data'] != null) {
+      return response['data'] as Map<String, dynamic>;
+    }
+    return response;
+  }
+
   Future<User> login(String email, String password) async {
     try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
+      final rawResponse = await _apiClient.post<Map<String, dynamic>>(
         ApiEndpoints.login,
         data: {
           'email': email,
           'password': password,
         },
       );
+
+      final response = _unwrapResponse(rawResponse);
 
       // Store tokens from nested tokens object
       final tokens = response['tokens'] as Map<String, dynamic>?;
@@ -54,7 +64,7 @@ class AuthService {
 
   Future<User> register(String email, String password, String name) async {
     try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
+      final rawResponse = await _apiClient.post<Map<String, dynamic>>(
         ApiEndpoints.register,
         data: {
           'email': email,
@@ -62,6 +72,8 @@ class AuthService {
           'displayName': name,
         },
       );
+
+      final response = _unwrapResponse(rawResponse);
 
       // Store tokens from nested tokens object
       final tokens = response['tokens'] as Map<String, dynamic>?;
@@ -94,9 +106,11 @@ class AuthService {
 
   Future<User> getCurrentUser() async {
     try {
-      final response = await _apiClient.get<Map<String, dynamic>>(
+      final rawResponse = await _apiClient.get<Map<String, dynamic>>(
         ApiEndpoints.me,
       );
+
+      final response = _unwrapResponse(rawResponse);
 
       if (response['user'] != null) {
         return User.fromJson(response['user']);
@@ -125,10 +139,12 @@ class AuthService {
     if (refreshToken == null) return false;
 
     try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
+      final rawResponse = await _apiClient.post<Map<String, dynamic>>(
         ApiEndpoints.refresh,
         data: {'refreshToken': refreshToken},
       );
+
+      final response = _unwrapResponse(rawResponse);
 
       // Handle nested tokens structure
       final tokens = response['tokens'] as Map<String, dynamic>? ?? response;
