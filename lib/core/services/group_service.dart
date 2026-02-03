@@ -9,15 +9,18 @@ class GroupService {
 
   Future<List<Group>> getGroups() async {
     try {
-      final response = await _apiClient.get<dynamic>(ApiEndpoints.groups);
+      final rawResponse = await _apiClient.get<dynamic>(ApiEndpoints.groups);
 
-      List<dynamic> groupsList;
-      if (response is Map<String, dynamic>) {
-        groupsList = response['groups'] ?? response['data'] ?? [];
-      } else if (response is List) {
-        groupsList = response;
+      Map<String, dynamic> response;
+      if (rawResponse is Map<String, dynamic>) {
+        response = _unwrapResponse(rawResponse);
       } else {
         return [];
+      }
+
+      List<dynamic> groupsList = response['groups'] ?? [];
+      if (groupsList.isEmpty && response is List) {
+        groupsList = response as List;
       }
 
       return groupsList
@@ -30,11 +33,12 @@ class GroupService {
 
   Future<Group> getGroupById(String id) async {
     try {
-      final response = await _apiClient.get<dynamic>(
+      final rawResponse = await _apiClient.get<dynamic>(
         ApiEndpoints.groupById(id),
       );
 
-      if (response is Map<String, dynamic>) {
+      if (rawResponse is Map<String, dynamic>) {
+        final response = _unwrapResponse(rawResponse);
         if (response['group'] != null) {
           return Group.fromJson(response['group']);
         }
@@ -47,20 +51,30 @@ class GroupService {
     }
   }
 
+  /// Unwrap the backend response which has format: {success: bool, data: {...}}
+  Map<String, dynamic> _unwrapResponse(Map<String, dynamic> response) {
+    if (response['data'] != null) {
+      return response['data'] as Map<String, dynamic>;
+    }
+    return response;
+  }
+
   Future<Group> createGroup({
     required String name,
     String? currencyCode,
     List<String>? memberIds,
   }) async {
     try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
+      final rawResponse = await _apiClient.post<Map<String, dynamic>>(
         ApiEndpoints.groups,
         data: {
           'name': name,
-          if (currencyCode != null) 'default_currency_code': currencyCode,
-          if (memberIds != null && memberIds.isNotEmpty) 'member_ids': memberIds,
+          if (currencyCode != null) 'defaultCurrencyCode': currencyCode,
+          if (memberIds != null && memberIds.isNotEmpty) 'memberIds': memberIds,
         },
       );
+
+      final response = _unwrapResponse(rawResponse);
 
       if (response['group'] != null) {
         return Group.fromJson(response['group']);
@@ -73,10 +87,12 @@ class GroupService {
 
   Future<Group> joinGroup(String joinCode) async {
     try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
+      final rawResponse = await _apiClient.post<Map<String, dynamic>>(
         ApiEndpoints.joinGroup,
-        data: {'join_code': joinCode},
+        data: {'joinCode': joinCode},
       );
+
+      final response = _unwrapResponse(rawResponse);
 
       if (response['group'] != null) {
         return Group.fromJson(response['group']);
@@ -89,18 +105,18 @@ class GroupService {
 
   Future<List<Balance>> getGroupBalances(String groupId) async {
     try {
-      final response = await _apiClient.get<dynamic>(
+      final rawResponse = await _apiClient.get<dynamic>(
         ApiEndpoints.groupBalances(groupId),
       );
 
-      List<dynamic> balancesList;
-      if (response is Map<String, dynamic>) {
-        balancesList = response['balances'] ?? response['data'] ?? [];
-      } else if (response is List) {
-        balancesList = response;
+      Map<String, dynamic> response;
+      if (rawResponse is Map<String, dynamic>) {
+        response = _unwrapResponse(rawResponse);
       } else {
         return [];
       }
+
+      List<dynamic> balancesList = response['balances'] ?? [];
 
       return balancesList
           .map((json) => Balance.fromJson(json as Map<String, dynamic>))
@@ -112,18 +128,18 @@ class GroupService {
 
   Future<List<Expense>> getGroupExpenses(String groupId) async {
     try {
-      final response = await _apiClient.get<dynamic>(
+      final rawResponse = await _apiClient.get<dynamic>(
         ApiEndpoints.groupExpenses(groupId),
       );
 
-      List<dynamic> expensesList;
-      if (response is Map<String, dynamic>) {
-        expensesList = response['expenses'] ?? response['data'] ?? [];
-      } else if (response is List) {
-        expensesList = response;
+      Map<String, dynamic> response;
+      if (rawResponse is Map<String, dynamic>) {
+        response = _unwrapResponse(rawResponse);
       } else {
         return [];
       }
+
+      List<dynamic> expensesList = response['expenses'] ?? [];
 
       return expensesList
           .map((json) => Expense.fromJson(json as Map<String, dynamic>))
