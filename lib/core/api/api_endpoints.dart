@@ -1,6 +1,6 @@
 class ApiEndpoints {
   static const String baseUrl =
-      'https://divvy-jones-backend-production.up.railway.app:8080';
+      'https://divvy-jones-backend-production.up.railway.app';
 
   // Auth
   static const String login = '/v1/auth/login';

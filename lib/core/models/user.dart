@@ -6,11 +6,11 @@ part 'user.g.dart';
 class User {
   final String id;
   final String email;
+  @JsonKey(name: 'displayName')
   final String name;
-  @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
-  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
+  final bool? emailVerified;
 
   User({
     required this.id,
@@ -18,6 +18,7 @@ class User {
     required this.name,
     this.avatarUrl,
     this.createdAt,
+    this.emailVerified,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);

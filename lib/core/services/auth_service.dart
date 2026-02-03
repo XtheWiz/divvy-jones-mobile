@@ -23,18 +23,21 @@ class AuthService {
         },
       );
 
-      // Store tokens
-      if (response['access_token'] != null) {
-        await _storage.setAccessToken(response['access_token']);
-      }
-      if (response['refresh_token'] != null) {
-        await _storage.setRefreshToken(response['refresh_token']);
-      }
-      if (response['expires_in'] != null) {
-        final expiry = DateTime.now().add(
-          Duration(seconds: response['expires_in']),
-        );
-        await _storage.setTokenExpiry(expiry);
+      // Store tokens from nested tokens object
+      final tokens = response['tokens'] as Map<String, dynamic>?;
+      if (tokens != null) {
+        if (tokens['accessToken'] != null) {
+          await _storage.setAccessToken(tokens['accessToken']);
+        }
+        if (tokens['refreshToken'] != null) {
+          await _storage.setRefreshToken(tokens['refreshToken']);
+        }
+        if (tokens['expiresIn'] != null) {
+          final expiry = DateTime.now().add(
+            Duration(seconds: tokens['expiresIn']),
+          );
+          await _storage.setTokenExpiry(expiry);
+        }
       }
 
       // Return user
@@ -56,22 +59,25 @@ class AuthService {
         data: {
           'email': email,
           'password': password,
-          'name': name,
+          'displayName': name,
         },
       );
 
-      // Store tokens
-      if (response['access_token'] != null) {
-        await _storage.setAccessToken(response['access_token']);
-      }
-      if (response['refresh_token'] != null) {
-        await _storage.setRefreshToken(response['refresh_token']);
-      }
-      if (response['expires_in'] != null) {
-        final expiry = DateTime.now().add(
-          Duration(seconds: response['expires_in']),
-        );
-        await _storage.setTokenExpiry(expiry);
+      // Store tokens from nested tokens object
+      final tokens = response['tokens'] as Map<String, dynamic>?;
+      if (tokens != null) {
+        if (tokens['accessToken'] != null) {
+          await _storage.setAccessToken(tokens['accessToken']);
+        }
+        if (tokens['refreshToken'] != null) {
+          await _storage.setRefreshToken(tokens['refreshToken']);
+        }
+        if (tokens['expiresIn'] != null) {
+          final expiry = DateTime.now().add(
+            Duration(seconds: tokens['expiresIn']),
+          );
+          await _storage.setTokenExpiry(expiry);
+        }
       }
 
       // Return user
@@ -121,18 +127,20 @@ class AuthService {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
         ApiEndpoints.refresh,
-        data: {'refresh_token': refreshToken},
+        data: {'refreshToken': refreshToken},
       );
 
-      if (response['access_token'] != null) {
-        await _storage.setAccessToken(response['access_token']);
+      // Handle nested tokens structure
+      final tokens = response['tokens'] as Map<String, dynamic>? ?? response;
+      if (tokens['accessToken'] != null) {
+        await _storage.setAccessToken(tokens['accessToken']);
       }
-      if (response['refresh_token'] != null) {
-        await _storage.setRefreshToken(response['refresh_token']);
+      if (tokens['refreshToken'] != null) {
+        await _storage.setRefreshToken(tokens['refreshToken']);
       }
-      if (response['expires_in'] != null) {
+      if (tokens['expiresIn'] != null) {
         final expiry = DateTime.now().add(
-          Duration(seconds: response['expires_in']),
+          Duration(seconds: tokens['expiresIn']),
         );
         await _storage.setTokenExpiry(expiry);
       }
