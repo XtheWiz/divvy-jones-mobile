@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/groups_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_title_bar.dart';
+import '../../../shared/widgets/error_display.dart';
 
 /// Group Details Screen
-class GroupDetailsScreen extends StatelessWidget {
+class GroupDetailsScreen extends StatefulWidget {
   final String groupName;
   final String groupId;
 
@@ -14,6 +18,28 @@ class GroupDetailsScreen extends StatelessWidget {
     required this.groupName,
     required this.groupId,
   });
+
+  @override
+  State<GroupDetailsScreen> createState() => _GroupDetailsScreenState();
+}
+
+class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadGroupDetails();
+    });
+  }
+
+  Future<void> _loadGroupDetails() async {
+    await context.read<GroupsProvider>().loadGroupDetails(widget.groupId);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,38 +51,79 @@ class GroupDetailsScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // Title Bar
               AppTitleBar(
-                title: groupName,
+                title: widget.groupName,
                 onBackPressed: () => Navigator.pop(context),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.settings_outlined),
-                    onPressed: () {},
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Settings coming soon!')),
+                      );
+                    },
                   ),
                 ],
               ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      // Group Summary Card
-                      _buildGroupSummaryCard(),
-                      const SizedBox(height: 24),
-                      // Members Section
-                      _buildMembersSection(),
-                      const SizedBox(height: 24),
-                      // Balances Section
-                      _buildBalancesSection(),
-                      const SizedBox(height: 24),
-                      // Expenses List
-                      _buildExpensesSection(),
-                      const SizedBox(height: 100),
-                    ],
-                  ),
+                child: Consumer<GroupsProvider>(
+                  builder: (context, groupsProvider, child) {
+                    if (groupsProvider.isLoadingDetails) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primaryPurple,
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (groupsProvider.error != null) {
+                      return ErrorDisplay(
+                        message: groupsProvider.error!,
+                        onRetry: _loadGroupDetails,
+                      );
+                    }
+
+                    final group = groupsProvider.selectedGroup;
+                    final balances = groupsProvider.selectedGroupBalances;
+                    final expenses = groupsProvider.selectedGroupExpenses;
+
+                    if (group == null) {
+                      return const Center(
+                        child: Text('Group not found'),
+                      );
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: _loadGroupDetails,
+                      color: AppColors.primaryPurple,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 25),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            _buildGroupSummaryCard(
+                              totalExpenses: group.totalExpenses ?? 0,
+                              expenseCount: expenses.length,
+                              memberCount: group.memberCount,
+                            ),
+                            const SizedBox(height: 24),
+                            _buildMembersSection(
+                              members: group.members ?? [],
+                            ),
+                            const SizedBox(height: 24),
+                            _buildBalancesSection(balances),
+                            const SizedBox(height: 24),
+                            _buildExpensesSection(expenses),
+                            const SizedBox(height: 100),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -64,9 +131,7 @@ class GroupDetailsScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.pushNamed(context, '/add-expense');
-        },
+        onPressed: () => context.push('/add-expense'),
         backgroundColor: AppColors.primaryPurple,
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text('Add Expense', style: AppTypography.button),
@@ -74,7 +139,11 @@ class GroupDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGroupSummaryCard() {
+  Widget _buildGroupSummaryCard({
+    required double totalExpenses,
+    required int expenseCount,
+    required int memberCount,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -91,7 +160,6 @@ class GroupDetailsScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Group Icon
           Container(
             width: 64,
             height: 64,
@@ -110,7 +178,7 @@ class GroupDetailsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '\$2,450.00',
+            '\$${totalExpenses.toStringAsFixed(2)}',
             style: AppTypography.heading1.copyWith(
               color: Colors.white,
               fontSize: 36,
@@ -120,14 +188,14 @@ class GroupDetailsScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildSummaryStat('Expenses', '12'),
+              _buildSummaryStat('Expenses', expenseCount.toString()),
               Container(
                 width: 1,
                 height: 30,
                 margin: const EdgeInsets.symmetric(horizontal: 24),
                 color: Colors.white.withValues(alpha: 0.3),
               ),
-              _buildSummaryStat('Members', '5'),
+              _buildSummaryStat('Members', memberCount.toString()),
             ],
           ),
         ],
@@ -152,15 +220,9 @@ class GroupDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMembersSection() {
-    final members = [
-      {'name': 'Wiruj', 'initial': 'W'},
-      {'name': 'Akane', 'initial': 'A'},
-      {'name': 'Makoto', 'initial': 'M'},
-      {'name': 'Sakura', 'initial': 'S'},
-      {'name': 'Kenji', 'initial': 'K'},
-    ];
-
+  Widget _buildMembersSection({
+    required List members,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -169,7 +231,11 @@ class GroupDetailsScreen extends StatelessWidget {
           children: [
             Text('Members', style: AppTypography.heading3),
             TextButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invite feature coming soon!')),
+                );
+              },
               icon: const Icon(Icons.person_add, size: 18),
               label: const Text('Invite'),
               style: TextButton.styleFrom(
@@ -179,62 +245,104 @@ class GroupDetailsScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 80,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: members.length,
-            itemBuilder: (context, index) {
-              final member = members[index];
-              return Container(
-                width: 70,
-                margin: const EdgeInsets.only(right: 12),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Center(
-                        child: Text(
-                          member['initial']!,
-                          style: AppTypography.label.copyWith(
-                            color: Colors.white,
+        if (members.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'No members yet',
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          SizedBox(
+            height: 80,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: members.length,
+              itemBuilder: (context, index) {
+                final member = members[index];
+                return Container(
+                  width: 70,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Center(
+                          child: Text(
+                            member.avatarInitial,
+                            style: AppTypography.label.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      member['name']!,
-                      style: AppTypography.caption,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              );
-            },
+                      const SizedBox(height: 8),
+                      Text(
+                        member.name ?? 'Member',
+                        style: AppTypography.caption,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
 
-  Widget _buildBalancesSection() {
+  Widget _buildBalancesSection(List balances) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Balances', style: AppTypography.heading3),
         const SizedBox(height: 12),
-        _buildBalanceItem('Wiruj', 'owes you', '\$45.00', true),
-        _buildBalanceItem('Akane', 'you owe', '\$23.50', false),
-        _buildBalanceItem('Makoto', 'settled up', '\$0.00', null),
+        if (balances.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'No balances yet',
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          ...balances.map((balance) => _buildBalanceItem(
+                balance.user?.name ?? 'Unknown',
+                balance.statusText,
+                balance.formattedBalance,
+                balance.isOwed ? true : (balance.owes ? false : null),
+              )),
+        const SizedBox(height: 8),
         AppButton(
           text: 'Settle Up',
-          onPressed: () {},
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Settle up feature coming soon!')),
+            );
+          },
           isOutlined: true,
           width: double.infinity,
           height: 48,
@@ -274,7 +382,7 @@ class GroupDetailsScreen extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                name[0],
+                name.isNotEmpty ? name[0] : 'U',
                 style: AppTypography.label.copyWith(color: Colors.white),
               ),
             ),
@@ -295,8 +403,8 @@ class GroupDetailsScreen extends StatelessWidget {
               color: isPositive == null
                   ? AppColors.textSecondary
                   : isPositive
-                  ? AppColors.success
-                  : AppColors.error,
+                      ? AppColors.success
+                      : AppColors.error,
             ),
           ),
         ],
@@ -304,7 +412,7 @@ class GroupDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildExpensesSection() {
+  Widget _buildExpensesSection(List expenses) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -312,33 +420,78 @@ class GroupDetailsScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Recent Expenses', style: AppTypography.heading3),
-            Text('See All', style: AppTypography.linkSmall),
+            GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('View all expenses')),
+                );
+              },
+              child: Text('See All', style: AppTypography.linkSmall),
+            ),
           ],
         ),
         const SizedBox(height: 12),
-        _buildExpenseItem(
-          icon: Icons.restaurant,
-          title: 'Dinner at Local Restaurant',
-          paidBy: 'Wiruj',
-          amount: '\$85.00',
-          date: 'Today',
-        ),
-        _buildExpenseItem(
-          icon: Icons.local_taxi,
-          title: 'Taxi to Airport',
-          paidBy: 'Akane',
-          amount: '\$45.50',
-          date: 'Yesterday',
-        ),
-        _buildExpenseItem(
-          icon: Icons.hotel,
-          title: 'Hotel Booking',
-          paidBy: 'Makoto',
-          amount: '\$320.00',
-          date: 'Jan 20',
-        ),
+        if (expenses.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 48,
+                  color: AppColors.textHint,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No expenses yet',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Add an expense to get started',
+                  style: AppTypography.caption,
+                ),
+              ],
+            ),
+          )
+        else
+          ...expenses.take(5).map((expense) => _buildExpenseItem(
+                icon: _getCategoryIcon(expense.category ?? 'other'),
+                title: expense.description,
+                paidBy: expense.paidByUser?.name ?? 'Someone',
+                amount: expense.formattedAmount,
+                date: expense.formattedDate,
+              )),
       ],
     );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return Icons.restaurant;
+      case 'transport':
+        return Icons.local_taxi;
+      case 'entertainment':
+        return Icons.movie;
+      case 'accommodation':
+        return Icons.hotel;
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'health':
+        return Icons.medical_services;
+      case 'utilities':
+        return Icons.power;
+      default:
+        return Icons.receipt;
+    }
   }
 
   Widget _buildExpenseItem({

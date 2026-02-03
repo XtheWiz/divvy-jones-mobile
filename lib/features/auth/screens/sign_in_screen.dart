@@ -1,7 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/services/mock_data_service.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -20,16 +21,16 @@ class _SignInScreenState extends State<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _mockService = MockDataService();
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill with demo credentials for easy testing
-    _emailController.text = 'demo@divvyjones.com';
-    _passwordController.text = 'demo123';
+    // Clear any previous error
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().clearError();
+    });
   }
 
   @override
@@ -46,7 +47,8 @@ class _SignInScreenState extends State<SignInScreen> {
         _errorMessage = null;
       });
 
-      final success = await _mockService.login(
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.login(
         _emailController.text.trim(),
         _passwordController.text,
       );
@@ -58,8 +60,7 @@ class _SignInScreenState extends State<SignInScreen> {
           context.go('/home');
         } else {
           setState(() {
-            _errorMessage =
-                'Invalid email or password. Try demo@divvyjones.com / demo123';
+            _errorMessage = authProvider.error ?? 'Login failed. Please try again.';
           });
         }
       }
@@ -81,19 +82,31 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
+    // TODO: Implement Google OAuth
     await Future.delayed(const Duration(seconds: 1));
     if (mounted) {
-      await _mockService.login('google@demo.com', 'demo');
-      context.go('/home');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google Sign-In coming soon!'),
+          backgroundColor: AppColors.primaryPurple,
+        ),
+      );
     }
   }
 
   Future<void> _handleFacebookSignIn() async {
     setState(() => _isLoading = true);
+    // TODO: Implement Facebook OAuth
     await Future.delayed(const Duration(seconds: 1));
     if (mounted) {
-      await _mockService.login('facebook@demo.com', 'demo');
-      context.go('/home');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Facebook Sign-In coming soon!'),
+          backgroundColor: AppColors.primaryPurple,
+        ),
+      );
     }
   }
 
@@ -140,36 +153,6 @@ class _SignInScreenState extends State<SignInScreen> {
                   const SizedBox(height: 40),
                   // Title
                   Text('Sign In', style: AppTypography.heading2),
-                  const SizedBox(height: 8),
-                  // Demo mode hint
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryPurple.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: AppColors.primaryPurple,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Demo: demo@divvyjones.com / demo123',
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.primaryPurple,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   // Error message
                   if (_errorMessage != null)

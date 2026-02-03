@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/models/models.dart';
+import '../../../core/providers/groups_provider.dart';
+import '../../../core/providers/expense_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -14,37 +18,97 @@ class AddExpenseScreen extends StatefulWidget {
 }
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
-  String _selectedGroup = 'South Asia Trip';
+  String? _selectedGroupId;
   String _splitType = 'equal';
-  final List<String> _selectedMembers = ['Wiruj', 'Akane', 'Makoto'];
-
-  final List<String> _groups = [
-    'South Asia Trip',
-    'Office Lunch Club',
-    'Movie Night Gang',
-    'Weekend Hikers',
-  ];
+  int _selectedCategoryIndex = 0;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   final List<Map<String, String>> _categories = [
-    {'icon': '🍔', 'name': 'Food'},
-    {'icon': '🚗', 'name': 'Transport'},
-    {'icon': '🏠', 'name': 'Accommodation'},
-    {'icon': '🎬', 'name': 'Entertainment'},
-    {'icon': '🛒', 'name': 'Shopping'},
-    {'icon': '💊', 'name': 'Health'},
-    {'icon': '📱', 'name': 'Utilities'},
-    {'icon': '🎁', 'name': 'Other'},
+    {'icon': '🍔', 'name': 'food'},
+    {'icon': '🚗', 'name': 'transport'},
+    {'icon': '🏠', 'name': 'accommodation'},
+    {'icon': '🎬', 'name': 'entertainment'},
+    {'icon': '🛒', 'name': 'shopping'},
+    {'icon': '💊', 'name': 'health'},
+    {'icon': '📱', 'name': 'utilities'},
+    {'icon': '🎁', 'name': 'other'},
   ];
 
-  int _selectedCategoryIndex = 0;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final groups = context.read<GroupsProvider>().groups;
+      if (groups.isNotEmpty && _selectedGroupId == null) {
+        setState(() {
+          _selectedGroupId = groups.first.id;
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
     _descriptionController.dispose();
     _amountController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleAddExpense() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      if (_selectedGroupId == null) {
+        setState(() {
+          _errorMessage = 'Please select a group';
+        });
+        return;
+      }
+
+      final amount = double.tryParse(_amountController.text);
+      if (amount == null || amount <= 0) {
+        setState(() {
+          _errorMessage = 'Please enter a valid amount';
+        });
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final expenseProvider = context.read<ExpenseProvider>();
+      final expense = await expenseProvider.createExpense(
+        CreateExpenseRequest(
+          groupId: _selectedGroupId!,
+          description: _descriptionController.text.trim(),
+          amount: amount,
+          category: _categories[_selectedCategoryIndex]['name']!,
+          splitType: _splitType,
+        ),
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        if (expense != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Expense added!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          setState(() {
+            _errorMessage = expenseProvider.error ?? 'Failed to add expense. Please try again.';
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -57,7 +121,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Title Bar
               AppTitleBar(
                 title: 'Add Expense',
                 onBackPressed: () => Navigator.pop(context),
@@ -65,49 +128,76 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 24),
-                      // Amount Input (Big)
-                      _buildAmountInput(),
-                      const SizedBox(height: 32),
-                      // Description
-                      AppTextField(
-                        label: 'Description',
-                        hintText: 'What was this expense for?',
-                        controller: _descriptionController,
-                      ),
-                      const SizedBox(height: 24),
-                      // Category Selection
-                      Text('Category', style: AppTypography.label),
-                      const SizedBox(height: 12),
-                      _buildCategorySelector(),
-                      const SizedBox(height: 24),
-                      // Group Selection
-                      Text('Group', style: AppTypography.label),
-                      const SizedBox(height: 12),
-                      _buildGroupSelector(),
-                      const SizedBox(height: 24),
-                      // Split Type
-                      Text('Split Type', style: AppTypography.label),
-                      const SizedBox(height: 12),
-                      _buildSplitTypeSelector(),
-                      const SizedBox(height: 24),
-                      // Split Preview
-                      _buildSplitPreview(),
-                      const SizedBox(height: 32),
-                      // Add Expense Button
-                      AppButton(
-                        text: 'Add Expense',
-                        onPressed: () {
-                          // TODO: Handle add expense
-                          Navigator.pop(context);
-                        },
-                        width: double.infinity,
-                      ),
-                      const SizedBox(height: 40),
-                    ],
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 24),
+                        if (_errorMessage != null)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  size: 16,
+                                  color: AppColors.error,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        _buildAmountInput(),
+                        const SizedBox(height: 32),
+                        AppTextField(
+                          label: 'Description',
+                          hintText: 'What was this expense for?',
+                          controller: _descriptionController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a description';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        Text('Category', style: AppTypography.label),
+                        const SizedBox(height: 12),
+                        _buildCategorySelector(),
+                        const SizedBox(height: 24),
+                        Text('Group', style: AppTypography.label),
+                        const SizedBox(height: 12),
+                        _buildGroupSelector(),
+                        const SizedBox(height: 24),
+                        Text('Split Type', style: AppTypography.label),
+                        const SizedBox(height: 12),
+                        _buildSplitTypeSelector(),
+                        const SizedBox(height: 24),
+                        _buildSplitPreview(),
+                        const SizedBox(height: 32),
+                        AppButton(
+                          text: 'Add Expense',
+                          onPressed: _isLoading ? null : _handleAddExpense,
+                          isLoading: _isLoading,
+                          width: double.infinity,
+                        ),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -156,7 +246,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               IntrinsicWidth(
                 child: TextField(
                   controller: _amountController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   textAlign: TextAlign.center,
                   style: AppTypography.heading1.copyWith(
                     color: Colors.white,
@@ -213,7 +303,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   Text(category['icon']!, style: const TextStyle(fontSize: 24)),
                   const SizedBox(height: 4),
                   Text(
-                    category['name']!,
+                    category['name']!.substring(0, 1).toUpperCase() +
+                        category['name']!.substring(1),
                     style: AppTypography.caption.copyWith(
                       color: isSelected
                           ? AppColors.primaryPurple
@@ -234,30 +325,64 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   Widget _buildGroupSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButton<String>(
-        value: _selectedGroup,
-        isExpanded: true,
-        underline: const SizedBox(),
-        icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textHint),
-        items: _groups.map((group) {
-          return DropdownMenuItem(
-            value: group,
-            child: Text(group, style: AppTypography.input),
+    return Consumer<GroupsProvider>(
+      builder: (context, groupsProvider, child) {
+        final groups = groupsProvider.groups;
+
+        if (groups.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.warning_outlined,
+                  size: 20,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No groups available. Create or join a group first.',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
-        }).toList(),
-        onChanged: (value) {
-          if (value != null) {
-            setState(() => _selectedGroup = value);
-          }
-        },
-      ),
+        }
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButton<String>(
+            value: _selectedGroupId,
+            isExpanded: true,
+            underline: const SizedBox(),
+            icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textHint),
+            items: groups.map((group) {
+              return DropdownMenuItem(
+                value: group.id,
+                child: Text(group.name, style: AppTypography.input),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedGroupId = value);
+              }
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -314,64 +439,88 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   Widget _buildSplitPreview() {
-    final amount = double.tryParse(_amountController.text) ?? 0;
-    final splitAmount = _selectedMembers.isNotEmpty
-        ? amount / _selectedMembers.length
-        : 0.0;
+    return Consumer<GroupsProvider>(
+      builder: (context, groupsProvider, child) {
+        final selectedGroup = _selectedGroupId != null
+            ? groupsProvider.getGroupById(_selectedGroupId!)
+            : null;
+        final members = selectedGroup?.members ?? [];
+        final amount = double.tryParse(_amountController.text) ?? 0;
+        final splitAmount = members.isNotEmpty ? amount / members.length : 0.0;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, 4),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Split Preview', style: AppTypography.label),
-          const SizedBox(height: 16),
-          ..._selectedMembers.map((member) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Center(
-                      child: Text(
-                        member[0],
-                        style: AppTypography.label.copyWith(
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(member, style: AppTypography.label)),
-                  Text(
-                    '\$${splitAmount.toStringAsFixed(2)}',
-                    style: AppTypography.label.copyWith(
-                      color: AppColors.primaryPurple,
-                    ),
-                  ),
-                ],
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                offset: const Offset(0, 4),
+                blurRadius: 10,
               ),
-            );
-          }),
-        ],
-      ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Split Preview', style: AppTypography.label),
+              const SizedBox(height: 16),
+              if (members.isEmpty)
+                Text(
+                  'Select a group to see split preview',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                )
+              else
+                ...members.take(5).map((member) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.primaryGradient,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Center(
+                            child: Text(
+                              member.avatarInitial,
+                              style: AppTypography.label.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            member.name ?? 'Member',
+                            style: AppTypography.label,
+                          ),
+                        ),
+                        Text(
+                          '\$${splitAmount.toStringAsFixed(2)}',
+                          style: AppTypography.label.copyWith(
+                            color: AppColors.primaryPurple,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              if (members.length > 5)
+                Text(
+                  '+${members.length - 5} more members',
+                  style: AppTypography.caption,
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

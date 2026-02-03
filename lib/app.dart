@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
+import 'core/providers/auth_provider.dart';
 import 'features/auth/screens/sign_in_screen.dart';
 import 'features/auth/screens/sign_up_screen.dart';
 import 'features/home/screens/main_shell.dart';
@@ -50,70 +52,108 @@ CustomTransitionPage<void> _buildPageWithFadeTransition(
   );
 }
 
-/// App Router Configuration
-final GoRouter router = GoRouter(
-  initialLocation: '/',
-  routes: [
-    // Auth Routes
-    GoRoute(
-      path: '/',
-      pageBuilder: (context, state) =>
-          _buildPageWithFadeTransition(context, state, const SignInScreen()),
-    ),
-    GoRoute(
-      path: '/sign-up',
-      pageBuilder: (context, state) =>
-          _buildPageWithSlideTransition(context, state, const SignUpScreen()),
-    ),
-    // Main App Routes
-    GoRoute(
-      path: '/home',
-      pageBuilder: (context, state) =>
-          _buildPageWithFadeTransition(context, state, const MainShell()),
-    ),
-    // Feature Routes
-    GoRoute(
-      path: '/join-group',
-      pageBuilder: (context, state) => _buildPageWithSlideTransition(
-        context,
-        state,
-        const JoinGroupScreen(),
-      ),
-    ),
-    GoRoute(
-      path: '/create-group',
-      pageBuilder: (context, state) => _buildPageWithSlideTransition(
-        context,
-        state,
-        const CreateGroupScreen(),
-      ),
-    ),
-    GoRoute(
-      path: '/group/:id',
-      pageBuilder: (context, state) {
-        final groupId = state.pathParameters['id'] ?? '';
-        final groupName = state.uri.queryParameters['name'] ?? 'Group Details';
-        return _buildPageWithSlideTransition(
-          context,
-          state,
-          GroupDetailsScreen(groupId: groupId, groupName: groupName),
-        );
-      },
-    ),
-    GoRoute(
-      path: '/add-expense',
-      pageBuilder: (context, state) => _buildPageWithSlideTransition(
-        context,
-        state,
-        const AddExpenseScreen(),
-      ),
-    ),
-  ],
-);
-
 /// Main App Widget
-class DivvyJonesApp extends StatelessWidget {
+class DivvyJonesApp extends StatefulWidget {
   const DivvyJonesApp({super.key});
+
+  @override
+  State<DivvyJonesApp> createState() => _DivvyJonesAppState();
+}
+
+class _DivvyJonesAppState extends State<DivvyJonesApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = _createRouter();
+  }
+
+  GoRouter _createRouter() {
+    return GoRouter(
+      initialLocation: '/',
+      refreshListenable: context.read<AuthProvider>(),
+      redirect: (context, state) {
+        final authProvider = context.read<AuthProvider>();
+        final isLoggedIn = authProvider.isLoggedIn;
+        final isAuthRoute = state.matchedLocation == '/' ||
+            state.matchedLocation == '/sign-up';
+
+        // If user is logged in and trying to access auth routes, redirect to home
+        if (isLoggedIn && isAuthRoute) {
+          return '/home';
+        }
+
+        // If user is not logged in and trying to access protected routes
+        if (!isLoggedIn && !isAuthRoute) {
+          // Check if auth status is still being determined
+          if (authProvider.status == AuthStatus.initial ||
+              authProvider.status == AuthStatus.loading) {
+            return null; // Don't redirect yet
+          }
+          return '/';
+        }
+
+        return null;
+      },
+      routes: [
+        // Auth Routes
+        GoRoute(
+          path: '/',
+          pageBuilder: (context, state) =>
+              _buildPageWithFadeTransition(context, state, const SignInScreen()),
+        ),
+        GoRoute(
+          path: '/sign-up',
+          pageBuilder: (context, state) =>
+              _buildPageWithSlideTransition(context, state, const SignUpScreen()),
+        ),
+        // Main App Routes
+        GoRoute(
+          path: '/home',
+          pageBuilder: (context, state) =>
+              _buildPageWithFadeTransition(context, state, const MainShell()),
+        ),
+        // Feature Routes
+        GoRoute(
+          path: '/join-group',
+          pageBuilder: (context, state) => _buildPageWithSlideTransition(
+            context,
+            state,
+            const JoinGroupScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/create-group',
+          pageBuilder: (context, state) => _buildPageWithSlideTransition(
+            context,
+            state,
+            const CreateGroupScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/group/:id',
+          pageBuilder: (context, state) {
+            final groupId = state.pathParameters['id'] ?? '';
+            final groupName = state.uri.queryParameters['name'] ?? 'Group Details';
+            return _buildPageWithSlideTransition(
+              context,
+              state,
+              GroupDetailsScreen(groupId: groupId, groupName: groupName),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/add-expense',
+          pageBuilder: (context, state) => _buildPageWithSlideTransition(
+            context,
+            state,
+            const AddExpenseScreen(),
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +161,7 @@ class DivvyJonesApp extends StatelessWidget {
       title: 'Divvy Jones',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }

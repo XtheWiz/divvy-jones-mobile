@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/services/mock_data_service.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/groups_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_title_bar.dart';
 
 /// Profile Screen
 class ProfileScreen extends StatelessWidget {
-  ProfileScreen({super.key});
-
-  final _mockService = MockDataService();
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final user = _mockService.currentUser;
-    final groups = _mockService.groups;
-
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -24,109 +21,110 @@ class ProfileScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // Title Bar
               const AppTitleBar(title: 'Profile', showBackButton: false),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 24),
-                      // Profile Avatar
-                      _buildProfileAvatar(user?.avatarInitial ?? 'U'),
-                      const SizedBox(height: 16),
-                      // User Info
-                      Text(
-                        user?.name ?? 'Captain',
-                        style: AppTypography.heading2,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user?.email ?? 'captain@divvyjones.com',
-                        style: AppTypography.bodySmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryPurple.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '🏴‍☠️ Pirate Captain',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.primaryPurple,
+                child: Consumer2<AuthProvider, GroupsProvider>(
+                  builder: (context, authProvider, groupsProvider, child) {
+                    final user = authProvider.currentUser;
+                    final groups = groupsProvider.groups;
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 25),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 24),
+                          _buildProfileAvatar(user?.avatarInitial ?? 'U'),
+                          const SizedBox(height: 16),
+                          Text(
+                            user?.name ?? 'Captain',
+                            style: AppTypography.heading2,
                           ),
-                        ),
+                          const SizedBox(height: 4),
+                          Text(
+                            user?.email ?? 'captain@divvyjones.com',
+                            style: AppTypography.bodySmall,
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryPurple.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Pirate Captain',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.primaryPurple,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          _buildStatsRow(groups.length),
+                          const SizedBox(height: 32),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.person_outline,
+                            title: 'Edit Profile',
+                            onTap: () => _showDemoSnackBar(context, 'Edit Profile'),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.notifications_outlined,
+                            title: 'Notifications',
+                            trailing: _buildBadge('3'),
+                            onTap: () =>
+                                _showDemoSnackBar(context, 'Notifications'),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.payment_outlined,
+                            title: 'Payment Methods',
+                            onTap: () =>
+                                _showDemoSnackBar(context, 'Payment Methods'),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.history,
+                            title: 'Transaction History',
+                            onTap: () =>
+                                _showDemoSnackBar(context, 'Transaction History'),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.help_outline,
+                            title: 'Help & Support',
+                            onTap: () =>
+                                _showDemoSnackBar(context, 'Help & Support'),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.settings_outlined,
+                            title: 'Settings',
+                            onTap: () => _showDemoSnackBar(context, 'Settings'),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.logout,
+                            title: 'Log Out',
+                            iconColor: AppColors.error,
+                            titleColor: AppColors.error,
+                            showArrow: false,
+                            onTap: () => _handleLogout(context),
+                          ),
+                          const SizedBox(height: 40),
+                          Text(
+                            'Divvy Jones v1.0.0',
+                            style: AppTypography.caption,
+                          ),
+                          const SizedBox(height: 100),
+                        ],
                       ),
-                      const SizedBox(height: 32),
-                      // Stats Row
-                      _buildStatsRow(groups.length),
-                      const SizedBox(height: 32),
-                      // Menu Items
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.person_outline,
-                        title: 'Edit Profile',
-                        onTap: () => _showDemoSnackBar(context, 'Edit Profile'),
-                      ),
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.notifications_outlined,
-                        title: 'Notifications',
-                        trailing: _buildBadge('3'),
-                        onTap: () =>
-                            _showDemoSnackBar(context, 'Notifications'),
-                      ),
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.payment_outlined,
-                        title: 'Payment Methods',
-                        onTap: () =>
-                            _showDemoSnackBar(context, 'Payment Methods'),
-                      ),
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.history,
-                        title: 'Transaction History',
-                        onTap: () =>
-                            _showDemoSnackBar(context, 'Transaction History'),
-                      ),
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.help_outline,
-                        title: 'Help & Support',
-                        onTap: () =>
-                            _showDemoSnackBar(context, 'Help & Support'),
-                      ),
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.settings_outlined,
-                        title: 'Settings',
-                        onTap: () => _showDemoSnackBar(context, 'Settings'),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.logout,
-                        title: 'Log Out',
-                        iconColor: AppColors.error,
-                        titleColor: AppColors.error,
-                        showArrow: false,
-                        onTap: () => _handleLogout(context),
-                      ),
-                      const SizedBox(height: 40),
-                      // App Version
-                      Text(
-                        'Divvy Jones v1.0.0 (Demo Mode)',
-                        style: AppTypography.caption,
-                      ),
-                      const SizedBox(height: 100),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -139,7 +137,7 @@ class ProfileScreen extends StatelessWidget {
   void _showDemoSnackBar(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$feature (Demo mode)'),
+        content: Text('$feature coming soon!'),
         backgroundColor: AppColors.primaryPurple,
         duration: const Duration(seconds: 1),
       ),
@@ -149,19 +147,21 @@ class ProfileScreen extends StatelessWidget {
   void _handleLogout(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Log Out'),
         content: const Text('Are you sure you want to log out, Captain?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              _mockService.logout();
-              Navigator.pop(context);
-              context.go('/');
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await context.read<AuthProvider>().logout();
+              if (context.mounted) {
+                context.go('/');
+              }
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Log Out'),
@@ -242,9 +242,9 @@ class ProfileScreen extends StatelessWidget {
         children: [
           _buildStatItem('Groups', groupCount.toString()),
           _buildDivider(),
-          _buildStatItem('Friends', '${MockDataService.allUsers.length - 1}'),
+          _buildStatItem('Friends', '-'),
           _buildDivider(),
-          _buildStatItem('Settled', '\$1.2K'),
+          _buildStatItem('Settled', '-'),
         ],
       ),
     );

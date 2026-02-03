@@ -1,7 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/services/mock_data_service.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -22,7 +23,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
-  final _mockService = MockDataService();
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -41,7 +41,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _errorMessage = null;
       });
 
-      final success = await _mockService.register(
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.register(
         _emailController.text.trim(),
         _passwordController.text,
         _fullNameController.text.trim(),
@@ -53,14 +54,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Welcome aboard, Captain! 🏴‍☠️'),
+              content: Text('Welcome aboard, Captain!'),
               backgroundColor: AppColors.success,
             ),
           );
           context.go('/home');
         } else {
           setState(() {
-            _errorMessage = 'Registration failed. Please try again.';
+            _errorMessage = authProvider.error ?? 'Registration failed. Please try again.';
           });
         }
       }
@@ -73,19 +74,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _handleGoogleSignUp() async {
     setState(() => _isLoading = true);
+    // TODO: Implement Google OAuth
     await Future.delayed(const Duration(seconds: 1));
     if (mounted) {
-      await _mockService.login('google@demo.com', 'demo');
-      context.go('/home');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google Sign-Up coming soon!'),
+          backgroundColor: AppColors.primaryPurple,
+        ),
+      );
     }
   }
 
   Future<void> _handleFacebookSignUp() async {
     setState(() => _isLoading = true);
+    // TODO: Implement Facebook OAuth
     await Future.delayed(const Duration(seconds: 1));
     if (mounted) {
-      await _mockService.login('facebook@demo.com', 'demo');
-      context.go('/home');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Facebook Sign-Up coming soon!'),
+          backgroundColor: AppColors.primaryPurple,
+        ),
+      );
     }
   }
 
@@ -190,6 +203,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ],
                             ),
                           ),
+                        // Full Name Input
+                        AppTextField(
+                          label: 'Full Name',
+                          hintText: 'Enter your name',
+                          controller: _fullNameController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your full name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
                         // Email Input
                         AppTextField(
                           label: 'Email',
@@ -217,21 +243,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your password';
                             }
-                            if (value.length < 4) {
-                              return 'Password must be at least 4 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        // Full Name Input
-                        AppTextField(
-                          label: 'Full Name',
-                          hintText: 'Enter your name',
-                          controller: _fullNameController,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your full name';
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
                             }
                             return null;
                           },

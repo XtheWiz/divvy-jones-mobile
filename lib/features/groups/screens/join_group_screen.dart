@@ -1,12 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/groups_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_title_bar.dart';
 
 /// Join Group Screen with QR Code
-class JoinGroupScreen extends StatelessWidget {
+class JoinGroupScreen extends StatefulWidget {
   const JoinGroupScreen({super.key});
+
+  @override
+  State<JoinGroupScreen> createState() => _JoinGroupScreenState();
+}
+
+class _JoinGroupScreenState extends State<JoinGroupScreen> {
+  final _codeController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleJoinGroup() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a group code';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final groupsProvider = context.read<GroupsProvider>();
+    final group = await groupsProvider.joinGroup(code);
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+
+      if (group != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Joined "${group.name}"!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        context.pop();
+      } else {
+        setState(() {
+          _errorMessage = groupsProvider.error ?? 'Invalid group code. Please try again.';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +72,6 @@ class JoinGroupScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // Title Bar
               AppTitleBar(
                 title: 'Join a Group',
                 onBackPressed: () => Navigator.pop(context),
@@ -29,10 +82,8 @@ class JoinGroupScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       const SizedBox(height: 40),
-                      // QR Code Scanner Area
                       _buildQRScannerArea(),
                       const SizedBox(height: 32),
-                      // Instructions
                       Text(
                         'Scan the QR code to join',
                         style: AppTypography.heading3,
@@ -45,7 +96,6 @@ class JoinGroupScreen extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                       const Spacer(),
-                      // Divider
                       Row(
                         children: [
                           Expanded(child: Divider(color: AppColors.border)),
@@ -57,15 +107,39 @@ class JoinGroupScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      // Enter Code Manually
+                      if (_errorMessage != null)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 16,
+                                color: AppColors.error,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       _buildCodeInput(),
                       const SizedBox(height: 24),
-                      // Join Button
                       AppButton(
                         text: 'Join Group',
-                        onPressed: () {
-                          // TODO: Handle join group
-                        },
+                        onPressed: _isLoading ? null : _handleJoinGroup,
+                        isLoading: _isLoading,
                         width: double.infinity,
                       ),
                       const SizedBox(height: 40),
@@ -91,7 +165,6 @@ class JoinGroupScreen extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // QR Scanner Placeholder
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -107,9 +180,15 @@ class JoinGroupScreen extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Coming soon',
+                style: AppTypography.caption.copyWith(
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
+              ),
             ],
           ),
-          // Corner Decorations
           Positioned(top: 40, left: 40, child: _buildCorner(true, true)),
           Positioned(top: 40, right: 40, child: _buildCorner(true, false)),
           Positioned(bottom: 40, left: 40, child: _buildCorner(false, true)),
@@ -156,6 +235,7 @@ class JoinGroupScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
+              controller: _codeController,
               decoration: InputDecoration(
                 hintText: 'Enter group code',
                 hintStyle: AppTypography.inputHint,
@@ -163,6 +243,8 @@ class JoinGroupScreen extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
               ),
               style: AppTypography.input,
+              textCapitalization: TextCapitalization.characters,
+              onSubmitted: (_) => _handleJoinGroup(),
             ),
           ),
         ],

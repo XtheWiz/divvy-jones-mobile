@@ -1,20 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/services/mock_data_service.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/groups_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_title_bar.dart';
+import '../../../shared/widgets/error_display.dart';
 
 /// Your Groups Screen
-class GroupsScreen extends StatelessWidget {
-  GroupsScreen({super.key});
+class GroupsScreen extends StatefulWidget {
+  const GroupsScreen({super.key});
 
-  final _mockService = MockDataService();
+  @override
+  State<GroupsScreen> createState() => _GroupsScreenState();
+}
+
+class _GroupsScreenState extends State<GroupsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadGroups();
+    });
+  }
+
+  Future<void> _loadGroups() async {
+    await context.read<GroupsProvider>().loadGroups();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final groups = _mockService.groups;
-
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -23,42 +38,72 @@ class GroupsScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // Title Bar
               const AppTitleBar(
                 title: 'Your Groups',
                 showBackButton: false,
                 actions: [],
               ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      // Search Bar
-                      _buildSearchBar(context),
-                      const SizedBox(height: 24),
-                      // Group Cards
-                      ...groups.map(
-                        (group) => Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildGroupCard(
-                            context: context,
-                            id: group.id,
-                            name: group.name,
-                            memberCount: group.members.length,
-                            totalExpenses:
-                                '\$${group.totalExpenses.toStringAsFixed(2)}',
-                            members: group.members
-                                .map((m) => m.avatarInitial)
-                                .toList(),
+                child: Consumer<GroupsProvider>(
+                  builder: (context, groupsProvider, child) {
+                    if (groupsProvider.isLoading) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primaryPurple,
                           ),
                         ),
+                      );
+                    }
+
+                    if (groupsProvider.error != null) {
+                      return ErrorDisplay(
+                        message: groupsProvider.error!,
+                        onRetry: _loadGroups,
+                      );
+                    }
+
+                    final groups = groupsProvider.groups;
+
+                    if (groups.isEmpty) {
+                      return _buildEmptyState(context);
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: _loadGroups,
+                      color: AppColors.primaryPurple,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 25),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            _buildSearchBar(context),
+                            const SizedBox(height: 24),
+                            ...groups.map(
+                              (group) => Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _buildGroupCard(
+                                  context: context,
+                                  id: group.id,
+                                  name: group.name,
+                                  memberCount: group.memberCount,
+                                  totalExpenses:
+                                      '\$${(group.totalExpenses ?? 0).toStringAsFixed(2)}',
+                                  members: group.members
+                                          ?.map((m) => m.avatarInitial)
+                                          .toList() ??
+                                      [],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 100),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 100),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -73,11 +118,67 @@ class GroupsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.group_outlined,
+              size: 64,
+              color: AppColors.textHint,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No groups yet',
+              style: AppTypography.heading3,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create a group or join one to start splitting expenses',
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => context.push('/create-group'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                OutlinedButton.icon(
+                  onPressed: () => context.push('/join-group'),
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text('Join'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryPurple,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSearchBar(BuildContext context) {
     return GestureDetector(
       onTap: () {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Search groups... (Demo mode)')),
+          const SnackBar(content: Text('Search coming soon!')),
         );
       },
       child: Container(
@@ -134,7 +235,6 @@ class GroupsScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                // Group Icon
                 Container(
                   width: 48,
                   height: 48,
@@ -145,7 +245,6 @@ class GroupsScreen extends StatelessWidget {
                   child: const Icon(Icons.group, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
-                // Group Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,7 +258,6 @@ class GroupsScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Total
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -171,12 +269,9 @@ class GroupsScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // Member Avatars
             Row(
               children: [
-                ...members
-                    .take(4)
-                    .map((initial) => _buildMemberAvatar(initial)),
+                ...members.take(4).map((initial) => _buildMemberAvatar(initial)),
                 if (members.length > 4)
                   Container(
                     width: 32,

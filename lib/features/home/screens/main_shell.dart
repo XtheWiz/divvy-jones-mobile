@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../core/services/mock_data_service.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/expense_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/bottom_nav_bar.dart';
@@ -20,11 +21,11 @@ class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
   late final List<Widget> _screens = [
-    HomeScreen(),
-    GroupsScreen(),
+    const HomeScreen(),
+    const GroupsScreen(),
     const AddExpenseScreen(),
     const _ActivityScreen(),
-    ProfileScreen(),
+    const ProfileScreen(),
   ];
 
   void _onNavTap(int index) {
@@ -56,15 +57,12 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// Activity Screen with mock data
+/// Activity Screen with real data from provider
 class _ActivityScreen extends StatelessWidget {
   const _ActivityScreen();
 
   @override
   Widget build(BuildContext context) {
-    final mockService = MockDataService();
-    final expenses = MockDataService.mockExpenses;
-
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
       child: SafeArea(
@@ -76,12 +74,45 @@ class _ActivityScreen extends StatelessWidget {
               child: Text('Activity', style: AppTypography.heading2),
             ),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 25),
-                itemCount: expenses.length,
-                itemBuilder: (context, index) {
-                  final expense = expenses[index];
-                  return _buildActivityItem(expense);
+              child: Consumer<ExpenseProvider>(
+                builder: (context, expenseProvider, child) {
+                  final expenses = expenseProvider.recentActivity;
+
+                  if (expenses.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: 64,
+                            color: AppColors.textHint,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No activity yet',
+                            style: AppTypography.heading3,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Your expense activity will appear here',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 25),
+                    itemCount: expenses.length,
+                    itemBuilder: (context, index) {
+                      final expense = expenses[index];
+                      return _buildActivityItem(expense);
+                    },
+                  );
                 },
               ),
             ),
@@ -91,8 +122,8 @@ class _ActivityScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActivityItem(MockExpense expense) {
-    final isSettled = expense.status == 'Settled';
+  Widget _buildActivityItem(dynamic expense) {
+    final isSettled = expense.status == 'settled';
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -118,7 +149,7 @@ class _ActivityScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              _getCategoryIcon(expense.category),
+              _getCategoryIcon(expense.category ?? 'other'),
               color: isSettled ? AppColors.success : AppColors.warning,
               size: 22,
             ),
@@ -128,10 +159,10 @@ class _ActivityScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(expense.title, style: AppTypography.label),
+                Text(expense.description, style: AppTypography.label),
                 const SizedBox(height: 4),
                 Text(
-                  'Paid by ${expense.paidBy} • ${expense.date}',
+                  'Paid by ${expense.paidByUser?.name ?? 'Someone'} • ${expense.formattedDate}',
                   style: AppTypography.caption,
                 ),
               ],
@@ -141,7 +172,7 @@ class _ActivityScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '\$${expense.amount.toStringAsFixed(2)}',
+                expense.formattedAmount,
                 style: AppTypography.label,
               ),
               const SizedBox(height: 4),
@@ -153,7 +184,7 @@ class _ActivityScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  expense.status,
+                  expense.status ?? 'Pending',
                   style: AppTypography.caption.copyWith(
                     color: isSettled ? AppColors.success : AppColors.warning,
                     fontWeight: FontWeight.w500,
@@ -179,6 +210,10 @@ class _ActivityScreen extends StatelessWidget {
         return Icons.hotel;
       case 'shopping':
         return Icons.shopping_bag;
+      case 'health':
+        return Icons.medical_services;
+      case 'utilities':
+        return Icons.power;
       default:
         return Icons.receipt;
     }

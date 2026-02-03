@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/groups_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -14,9 +17,11 @@ class CreateGroupScreen extends StatefulWidget {
 }
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _groupNameController = TextEditingController();
   int _selectedThemeIndex = 0;
-  final List<String> _selectedMembers = [];
+  bool _isLoading = false;
+  String? _errorMessage;
 
   final List<Color> _themeColors = [
     AppColors.primaryPurple,
@@ -29,29 +34,42 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     const Color(0xFFAA96DA),
   ];
 
-  final List<Map<String, String>> _suggestedMembers = [
-    {'name': 'Wiruj', 'initial': 'W'},
-    {'name': 'Akane', 'initial': 'A'},
-    {'name': 'Makoto', 'initial': 'M'},
-    {'name': 'Sakura', 'initial': 'S'},
-    {'name': 'Kenji', 'initial': 'K'},
-    {'name': 'Yuki', 'initial': 'Y'},
-  ];
-
   @override
   void dispose() {
     _groupNameController.dispose();
     super.dispose();
   }
 
-  void _toggleMember(String name) {
-    setState(() {
-      if (_selectedMembers.contains(name)) {
-        _selectedMembers.remove(name);
-      } else {
-        _selectedMembers.add(name);
+  Future<void> _handleCreateGroup() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final groupsProvider = context.read<GroupsProvider>();
+      final group = await groupsProvider.createGroup(
+        _groupNameController.text.trim(),
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        if (group != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Group "${group.name}" created!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          context.pop();
+        } else {
+          setState(() {
+            _errorMessage = groupsProvider.error ?? 'Failed to create group. Please try again.';
+          });
+        }
       }
-    });
+    }
   }
 
   @override
@@ -64,7 +82,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Title Bar
               AppTitleBar(
                 title: 'Create a Group',
                 onBackPressed: () => Navigator.pop(context),
@@ -72,62 +89,93 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 24),
-                      // Group Name Input
-                      AppTextField(
-                        label: 'Group Name',
-                        hintText: 'Enter group name',
-                        controller: _groupNameController,
-                      ),
-                      const SizedBox(height: 32),
-                      // Theme Color Selection
-                      Text('Choose Theme', style: AppTypography.label),
-                      const SizedBox(height: 16),
-                      _buildThemeSelector(),
-                      const SizedBox(height: 32),
-                      // Add Members
-                      Text('Add Members', style: AppTypography.label),
-                      const SizedBox(height: 16),
-                      _buildMemberSelector(),
-                      const SizedBox(height: 16),
-                      // Selected Members
-                      if (_selectedMembers.isNotEmpty) ...[
-                        Text(
-                          '${_selectedMembers.length} members selected',
-                          style: AppTypography.caption,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 24),
+                        if (_errorMessage != null)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  size: 16,
+                                  color: AppColors.error,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        AppTextField(
+                          label: 'Group Name',
+                          hintText: 'Enter group name',
+                          controller: _groupNameController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a group name';
+                            }
+                            if (value.length < 2) {
+                              return 'Group name must be at least 2 characters';
+                            }
+                            return null;
+                          },
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _selectedMembers.map((name) {
-                            return Chip(
-                              label: Text(name),
-                              deleteIcon: const Icon(Icons.close, size: 16),
-                              onDeleted: () => _toggleMember(name),
-                              backgroundColor: AppColors.primaryLight
-                                  .withValues(alpha: 0.2),
-                              labelStyle: AppTypography.caption.copyWith(
+                        const SizedBox(height: 32),
+                        Text('Choose Theme', style: AppTypography.label),
+                        const SizedBox(height: 16),
+                        _buildThemeSelector(),
+                        const SizedBox(height: 32),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryPurple.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                size: 20,
                                 color: AppColors.primaryPurple,
                               ),
-                            );
-                          }).toList(),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'You can invite members after creating the group using the join code.',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.primaryPurple,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 40),
+                        AppButton(
+                          text: 'Create Group',
+                          onPressed: _isLoading ? null : _handleCreateGroup,
+                          isLoading: _isLoading,
+                          width: double.infinity,
+                        ),
+                        const SizedBox(height: 40),
                       ],
-                      const SizedBox(height: 40),
-                      // Create Button
-                      AppButton(
-                        text: 'Create Group',
-                        onPressed: () {
-                          // TODO: Handle create group
-                        },
-                        width: double.infinity,
-                      ),
-                      const SizedBox(height: 40),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -171,80 +219,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           ),
         );
       }),
-    );
-  }
-
-  Widget _buildMemberSelector() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, 4),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Search Members
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.search, color: AppColors.textHint, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Search contacts...',
-                    style: AppTypography.inputHint,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Member List
-          ...List.generate(_suggestedMembers.length, (index) {
-            final member = _suggestedMembers[index];
-            final isSelected = _selectedMembers.contains(member['name']);
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Center(
-                  child: Text(
-                    member['initial']!,
-                    style: AppTypography.label.copyWith(color: Colors.white),
-                  ),
-                ),
-              ),
-              title: Text(member['name']!, style: AppTypography.label),
-              trailing: Checkbox(
-                value: isSelected,
-                onChanged: (_) => _toggleMember(member['name']!),
-                activeColor: AppColors.primaryPurple,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              onTap: () => _toggleMember(member['name']!),
-            );
-          }),
-        ],
-      ),
     );
   }
 }

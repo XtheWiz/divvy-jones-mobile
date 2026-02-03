@@ -1,14 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/services/mock_data_service.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/groups_provider.dart';
+import '../../../core/providers/expense_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 
 /// Home Screen - Main Dashboard
-class HomeScreen extends StatelessWidget {
-  HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
-  final _mockService = MockDataService();
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
+  }
+
+  Future<void> _loadData() async {
+    final groupsProvider = context.read<GroupsProvider>();
+    await groupsProvider.loadGroups();
+
+    // Load expenses for all groups
+    final expenseProvider = context.read<ExpenseProvider>();
+    for (final group in groupsProvider.groups) {
+      await expenseProvider.loadGroupExpenses(group.id);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,25 +42,26 @@ class HomeScreen extends StatelessWidget {
       height: double.infinity,
       decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 25),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              // Header
-              _buildHeader(context),
-              const SizedBox(height: 24),
-              // Balance Card
-              _buildBalanceCard(),
-              const SizedBox(height: 24),
-              // Quick Actions
-              _buildQuickActions(context),
-              const SizedBox(height: 24),
-              // Recent Activity
-              _buildRecentActivitySection(context),
-              const SizedBox(height: 100),
-            ],
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          color: AppColors.primaryPurple,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 25),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                _buildHeader(context),
+                const SizedBox(height: 24),
+                _buildBalanceCard(),
+                const SizedBox(height: 24),
+                _buildQuickActions(context),
+                const SizedBox(height: 24),
+                _buildRecentActivitySection(context),
+                const SizedBox(height: 100),
+              ],
+            ),
           ),
         ),
       ),
@@ -43,153 +69,166 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final user = _mockService.currentUser;
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Ahoy, ${user?.name.split(' ').first ?? 'Captain'}! 👋',
-                style: AppTypography.heading3,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "Here's your treasure summary",
-                style: AppTypography.bodySmall,
-              ),
-            ],
-          ),
-        ),
-        // Profile Avatar
-        GestureDetector(
-          onTap: () {
-            // Navigate to profile tab (index 4)
-          },
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: Center(
-              child: Text(
-                user?.avatarInitial ?? 'U',
-                style: AppTypography.label.copyWith(color: Colors.white),
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final user = authProvider.currentUser;
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ahoy, ${user?.name.split(' ').first ?? 'Captain'}!',
+                    style: AppTypography.heading3,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Here's your treasure summary",
+                    style: AppTypography.bodySmall,
+                  ),
+                ],
               ),
             ),
-          ),
-        ),
-      ],
+            GestureDetector(
+              onTap: () {},
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Center(
+                  child: Text(
+                    user?.avatarInitial ?? 'U',
+                    style: AppTypography.label.copyWith(color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildBalanceCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryPurple.withValues(alpha: 0.3),
-            offset: const Offset(0, 8),
-            blurRadius: 20,
+    // TODO: Implement real balance calculation from API
+    // For now, calculate from groups total expenses
+    return Consumer<GroupsProvider>(
+      builder: (context, groupsProvider, child) {
+        final totalExpenses = groupsProvider.totalExpenses;
+        // Placeholder balance calculation
+        final netBalance = totalExpenses > 0 ? totalExpenses * 0.15 : 0.0;
+        final totalOwed = totalExpenses > 0 ? totalExpenses * 0.25 : 0.0;
+        final totalOwing = totalExpenses > 0 ? totalExpenses * 0.10 : 0.0;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryPurple.withValues(alpha: 0.3),
+                offset: const Offset(0, 8),
+                blurRadius: 20,
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Net Balance',
-            style: AppTypography.bodyMedium.copyWith(
-              color: Colors.white.withValues(alpha: 0.8),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '\$${_mockService.netBalance.toStringAsFixed(2)}',
-                style: AppTypography.heading1.copyWith(
-                  color: Colors.white,
-                  fontSize: 36,
+                'Net Balance',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _mockService.netBalance >= 0 ? 'You\'re owed' : 'You owe',
-                  style: AppTypography.caption.copyWith(color: Colors.white),
-                ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '\$${netBalance.toStringAsFixed(2)}',
+                    style: AppTypography.heading1.copyWith(
+                      color: Colors.white,
+                      fontSize: 36,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      netBalance >= 0 ? 'You\'re owed' : 'You owe',
+                      style: AppTypography.caption.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'You are owed',
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${totalOwed.toStringAsFixed(2)}',
+                          style: AppTypography.bodyLarge.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 40,
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'You owe',
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${totalOwing.toStringAsFixed(2)}',
+                          style: AppTypography.bodyLarge.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'You are owed',
-                      style: AppTypography.caption.copyWith(
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '\$${_mockService.totalOwed.toStringAsFixed(2)}',
-                      style: AppTypography.bodyLarge.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 40,
-                color: Colors.white.withValues(alpha: 0.3),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'You owe',
-                      style: AppTypography.caption.copyWith(
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '\$${_mockService.totalOwing.toStringAsFixed(2)}',
-                      style: AppTypography.bodyLarge.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -259,46 +298,88 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildRecentActivitySection(BuildContext context) {
-    final recentExpenses = _mockService.recentActivity;
+    return Consumer<ExpenseProvider>(
+      builder: (context, expenseProvider, child) {
+        final recentExpenses = expenseProvider.recentActivity;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Recent Activity', style: AppTypography.heading3),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('View all activity')),
-                );
-              },
-              child: Text('See All', style: AppTypography.linkSmall),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Recent Activity', style: AppTypography.heading3),
+                GestureDetector(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('View all activity')),
+                    );
+                  },
+                  child: Text('See All', style: AppTypography.linkSmall),
+                ),
+              ],
             ),
+            const SizedBox(height: 16),
+            if (recentExpenses.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      offset: const Offset(0, 4),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      size: 48,
+                      color: AppColors.textHint,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No recent activity',
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add an expense to get started',
+                      style: AppTypography.caption,
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...recentExpenses.map(
+                (expense) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildActivityItem(
+                    icon: _getCategoryIcon(expense.category ?? 'other'),
+                    iconColor: expense.status == 'settled'
+                        ? AppColors.success
+                        : AppColors.warning,
+                    title: expense.description,
+                    subtitle: expense.paidByUser?.name ?? 'Someone',
+                    amount: expense.formattedAmount,
+                    status: expense.status ?? 'Pending',
+                    statusColor: expense.status == 'settled'
+                        ? AppColors.success
+                        : AppColors.warning,
+                    time: expense.formattedDate,
+                  ),
+                ),
+              ),
           ],
-        ),
-        const SizedBox(height: 16),
-        ...recentExpenses.map(
-          (expense) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildActivityItem(
-              icon: _getCategoryIcon(expense.category),
-              iconColor: expense.status == 'Settled'
-                  ? AppColors.success
-                  : AppColors.warning,
-              title: expense.title,
-              subtitle: 'With ${expense.splitWith.join(', ')}',
-              amount: '\$${expense.amount.toStringAsFixed(2)}',
-              status: expense.status,
-              statusColor: expense.status == 'Settled'
-                  ? AppColors.success
-                  : AppColors.warning,
-              time: expense.date,
-            ),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -314,6 +395,10 @@ class HomeScreen extends StatelessWidget {
         return Icons.hotel;
       case 'shopping':
         return Icons.shopping_bag;
+      case 'health':
+        return Icons.medical_services;
+      case 'utilities':
+        return Icons.power;
       default:
         return Icons.receipt;
     }
@@ -362,7 +447,7 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Text(title, style: AppTypography.label),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: AppTypography.caption),
+                    Text('Paid by $subtitle', style: AppTypography.caption),
                   ],
                 ),
               ),
