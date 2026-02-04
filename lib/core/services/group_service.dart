@@ -11,16 +11,21 @@ class GroupService {
     try {
       final rawResponse = await _apiClient.get<dynamic>(ApiEndpoints.groups);
 
-      Map<String, dynamic> response;
+      List<dynamic> groupsList;
       if (rawResponse is Map<String, dynamic>) {
-        response = _unwrapResponse(rawResponse);
+        // Backend returns {success: true, data: [...]}
+        final data = rawResponse['data'];
+        if (data is List) {
+          groupsList = data;
+        } else if (data is Map<String, dynamic>) {
+          groupsList = data['groups'] ?? [];
+        } else {
+          groupsList = [];
+        }
+      } else if (rawResponse is List) {
+        groupsList = rawResponse;
       } else {
         return [];
-      }
-
-      List<dynamic> groupsList = response['groups'] ?? [];
-      if (groupsList.isEmpty && response is List) {
-        groupsList = response as List;
       }
 
       return groupsList
