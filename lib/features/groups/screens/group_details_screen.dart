@@ -108,7 +108,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                             _buildGroupSummaryCard(
                               totalExpenses: group.totalExpenses ?? 0,
                               expenseCount: expenses.length,
-                              memberCount: group.memberCount,
+                              memberCount: group.membersCount,
                             ),
                             const SizedBox(height: 24),
                             _buildMembersSection(

@@ -88,7 +88,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                   context: context,
                                   id: group.id,
                                   name: group.name,
-                                  memberCount: group.memberCount,
+                                  memberCount: group.membersCount,
                                   totalExpenses:
                                       '\$${(group.totalExpenses ?? 0).toStringAsFixed(2)}',
                                   members: group.members

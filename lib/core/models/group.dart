@@ -7,16 +7,12 @@ part 'group.g.dart';
 class Group {
   final String id;
   final String name;
-  @JsonKey(name: 'join_code')
   final String? joinCode;
-  @JsonKey(name: 'default_currency_code')
   final String? defaultCurrencyCode;
   final List<GroupMember>? members;
-  @JsonKey(name: 'total_expenses')
   final double? totalExpenses;
-  @JsonKey(name: 'expense_count')
-  final int? expenseCount;
-  @JsonKey(name: 'created_at')
+  final int? memberCount;
+  final String? role;
   final DateTime? createdAt;
 
   Group({
@@ -26,14 +22,15 @@ class Group {
     this.defaultCurrencyCode,
     this.members,
     this.totalExpenses,
-    this.expenseCount,
+    this.memberCount,
+    this.role,
     this.createdAt,
   });
 
   factory Group.fromJson(Map<String, dynamic> json) => _$GroupFromJson(json);
   Map<String, dynamic> toJson() => _$GroupToJson(this);
 
-  int get memberCount => members?.length ?? 0;
+  int get membersCount => memberCount ?? members?.length ?? 0;
 }
 
 @JsonSerializable()
