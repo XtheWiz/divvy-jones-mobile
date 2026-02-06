@@ -1,6 +1,7 @@
+import '../constants/app_config.dart';
+
 class ApiEndpoints {
-  static const String baseUrl =
-      'https://divvy-jones-backend-production.up.railway.app';
+  static String get baseUrl => AppConfig.apiBaseUrl;
 
   // Auth
   static const String login = '/v1/auth/login';

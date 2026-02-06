@@ -1,9 +1,12 @@
 import '../api/api_client.dart';
 import '../api/api_endpoints.dart';
+import '../api/response_unwrapper.dart';
 import '../models/models.dart';
 import '../storage/secure_storage.dart';
+import '../utils/app_logger.dart';
 
 class AuthService {
+  static const _log = AppLogger('AuthService');
   final ApiClient _apiClient;
   final SecureStorage _storage;
 
@@ -12,14 +15,6 @@ class AuthService {
     required SecureStorage storage,
   })  : _apiClient = apiClient,
         _storage = storage;
-
-  /// Unwrap the backend response which has format: {success: bool, data: {...}}
-  Map<String, dynamic> _unwrapResponse(Map<String, dynamic> response) {
-    if (response['data'] != null) {
-      return response['data'] as Map<String, dynamic>;
-    }
-    return response;
-  }
 
   Future<User> login(String email, String password) async {
     try {
@@ -31,24 +26,8 @@ class AuthService {
         },
       );
 
-      final response = _unwrapResponse(rawResponse);
-
-      // Store tokens from nested tokens object
-      final tokens = response['tokens'] as Map<String, dynamic>?;
-      if (tokens != null) {
-        if (tokens['accessToken'] != null) {
-          await _storage.setAccessToken(tokens['accessToken']);
-        }
-        if (tokens['refreshToken'] != null) {
-          await _storage.setRefreshToken(tokens['refreshToken']);
-        }
-        if (tokens['expiresIn'] != null) {
-          final expiry = DateTime.now().add(
-            Duration(seconds: tokens['expiresIn']),
-          );
-          await _storage.setTokenExpiry(expiry);
-        }
-      }
+      final response = ResponseUnwrapper.unwrapMap(rawResponse);
+      await _storeTokens(response);
 
       // Return user
       if (response['user'] != null) {
@@ -57,7 +36,8 @@ class AuthService {
 
       // If user is not in response, fetch it
       return await getCurrentUser();
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Login failed for $email', e, st);
       rethrow;
     }
   }
@@ -73,24 +53,8 @@ class AuthService {
         },
       );
 
-      final response = _unwrapResponse(rawResponse);
-
-      // Store tokens from nested tokens object
-      final tokens = response['tokens'] as Map<String, dynamic>?;
-      if (tokens != null) {
-        if (tokens['accessToken'] != null) {
-          await _storage.setAccessToken(tokens['accessToken']);
-        }
-        if (tokens['refreshToken'] != null) {
-          await _storage.setRefreshToken(tokens['refreshToken']);
-        }
-        if (tokens['expiresIn'] != null) {
-          final expiry = DateTime.now().add(
-            Duration(seconds: tokens['expiresIn']),
-          );
-          await _storage.setTokenExpiry(expiry);
-        }
-      }
+      final response = ResponseUnwrapper.unwrapMap(rawResponse);
+      await _storeTokens(response);
 
       // Return user
       if (response['user'] != null) {
@@ -99,7 +63,8 @@ class AuthService {
 
       // If user is not in response, fetch it
       return await getCurrentUser();
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Registration failed for $email', e, st);
       rethrow;
     }
   }
@@ -110,14 +75,15 @@ class AuthService {
         ApiEndpoints.me,
       );
 
-      final response = _unwrapResponse(rawResponse);
+      final response = ResponseUnwrapper.unwrapMap(rawResponse);
 
       if (response['user'] != null) {
         return User.fromJson(response['user']);
       }
 
       return User.fromJson(response);
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to fetch current user', e, st);
       rethrow;
     }
   }
@@ -144,10 +110,9 @@ class AuthService {
         data: {'refreshToken': refreshToken},
       );
 
-      final response = _unwrapResponse(rawResponse);
-
-      // Handle nested tokens structure
+      final response = ResponseUnwrapper.unwrapMap(rawResponse);
       final tokens = response['tokens'] as Map<String, dynamic>? ?? response;
+
       if (tokens['accessToken'] != null) {
         await _storage.setAccessToken(tokens['accessToken']);
       }
@@ -162,8 +127,28 @@ class AuthService {
       }
 
       return true;
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Token refresh failed', e, st);
       return false;
+    }
+  }
+
+  /// Extracts and stores tokens from a login/register response.
+  Future<void> _storeTokens(Map<String, dynamic> response) async {
+    final tokens = response['tokens'] as Map<String, dynamic>?;
+    if (tokens == null) return;
+
+    if (tokens['accessToken'] != null) {
+      await _storage.setAccessToken(tokens['accessToken']);
+    }
+    if (tokens['refreshToken'] != null) {
+      await _storage.setRefreshToken(tokens['refreshToken']);
+    }
+    if (tokens['expiresIn'] != null) {
+      final expiry = DateTime.now().add(
+        Duration(seconds: tokens['expiresIn']),
+      );
+      await _storage.setTokenExpiry(expiry);
     }
   }
 }

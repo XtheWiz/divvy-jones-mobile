@@ -6,6 +6,7 @@ import '../../../core/providers/groups_provider.dart';
 import '../../../core/providers/expense_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/category_icons.dart';
 
 /// Home Screen - Main Dashboard
 class HomeScreen extends StatefulWidget {
@@ -115,15 +116,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBalanceCard() {
-    // TODO: Implement real balance calculation from API
-    // For now, calculate from groups total expenses
     return Consumer<GroupsProvider>(
       builder: (context, groupsProvider, child) {
-        final totalExpenses = groupsProvider.totalExpenses;
-        // Placeholder balance calculation
-        final netBalance = totalExpenses > 0 ? totalExpenses * 0.15 : 0.0;
-        final totalOwed = totalExpenses > 0 ? totalExpenses * 0.25 : 0.0;
-        final totalOwing = totalExpenses > 0 ? totalExpenses * 0.10 : 0.0;
+        final netBalance = groupsProvider.netBalance;
+        final totalOwed = groupsProvider.totalOwed;
+        final totalOwing = groupsProvider.totalOwing;
 
         return Container(
           width: double.infinity,
@@ -362,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 (expense) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildActivityItem(
-                    icon: _getCategoryIcon(expense.category ?? 'other'),
+                    icon: CategoryIcons.fromCategory(expense.category ?? 'other'),
                     iconColor: expense.status == 'settled'
                         ? AppColors.success
                         : AppColors.warning,
@@ -381,27 +378,6 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-        return Icons.restaurant;
-      case 'transport':
-        return Icons.local_taxi;
-      case 'entertainment':
-        return Icons.movie;
-      case 'accommodation':
-        return Icons.hotel;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'health':
-        return Icons.medical_services;
-      case 'utilities':
-        return Icons.power;
-      default:
-        return Icons.receipt;
-    }
   }
 
   Widget _buildActivityItem({

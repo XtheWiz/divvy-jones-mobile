@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/expense_service.dart';
 import '../api/api_exceptions.dart';
+import '../utils/app_logger.dart';
 
 enum ExpenseStatus {
   initial,
@@ -12,6 +13,7 @@ enum ExpenseStatus {
 }
 
 class ExpenseProvider with ChangeNotifier {
+  static const _log = AppLogger('ExpenseProvider');
   final ExpenseService _expenseService;
 
   ExpenseProvider({required ExpenseService expenseService})
@@ -46,7 +48,8 @@ class ExpenseProvider with ChangeNotifier {
     } on ApiException catch (e) {
       _error = e.message;
       _status = ExpenseStatus.error;
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to load expenses for group $groupId', e, st);
       _error = 'Failed to load expenses. Please try again.';
       _status = ExpenseStatus.error;
     }
@@ -76,7 +79,8 @@ class ExpenseProvider with ChangeNotifier {
       _status = ExpenseStatus.error;
       notifyListeners();
       return null;
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to create expense', e, st);
       _error = 'Failed to create expense. Please try again.';
       _status = ExpenseStatus.error;
       notifyListeners();
@@ -102,7 +106,8 @@ class ExpenseProvider with ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to delete expense $expenseId', e, st);
       _error = 'Failed to delete expense. Please try again.';
       notifyListeners();
       return false;

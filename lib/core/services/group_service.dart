@@ -1,8 +1,11 @@
 import '../api/api_client.dart';
 import '../api/api_endpoints.dart';
+import '../api/response_unwrapper.dart';
 import '../models/models.dart';
+import '../utils/app_logger.dart';
 
 class GroupService {
+  static const _log = AppLogger('GroupService');
   final ApiClient _apiClient;
 
   GroupService({required ApiClient apiClient}) : _apiClient = apiClient;
@@ -10,28 +13,13 @@ class GroupService {
   Future<List<Group>> getGroups() async {
     try {
       final rawResponse = await _apiClient.get<dynamic>(ApiEndpoints.groups);
-
-      List<dynamic> groupsList;
-      if (rawResponse is Map<String, dynamic>) {
-        // Backend returns {success: true, data: [...]}
-        final data = rawResponse['data'];
-        if (data is List) {
-          groupsList = data;
-        } else if (data is Map<String, dynamic>) {
-          groupsList = data['groups'] ?? [];
-        } else {
-          groupsList = [];
-        }
-      } else if (rawResponse is List) {
-        groupsList = rawResponse;
-      } else {
-        return [];
-      }
+      final groupsList = ResponseUnwrapper.unwrapList(rawResponse, listKey: 'groups');
 
       return groupsList
           .map((json) => Group.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to fetch groups', e, st);
       rethrow;
     }
   }
@@ -43,7 +31,7 @@ class GroupService {
       );
 
       if (rawResponse is Map<String, dynamic>) {
-        final response = _unwrapResponse(rawResponse);
+        final response = ResponseUnwrapper.unwrapMap(rawResponse);
         if (response['group'] != null) {
           return Group.fromJson(response['group']);
         }
@@ -51,17 +39,10 @@ class GroupService {
       }
 
       throw Exception('Invalid response format');
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to fetch group $id', e, st);
       rethrow;
     }
-  }
-
-  /// Unwrap the backend response which has format: {success: bool, data: {...}}
-  Map<String, dynamic> _unwrapResponse(Map<String, dynamic> response) {
-    if (response['data'] != null) {
-      return response['data'] as Map<String, dynamic>;
-    }
-    return response;
   }
 
   Future<Group> createGroup({
@@ -79,13 +60,14 @@ class GroupService {
         },
       );
 
-      final response = _unwrapResponse(rawResponse);
+      final response = ResponseUnwrapper.unwrapMap(rawResponse);
 
       if (response['group'] != null) {
         return Group.fromJson(response['group']);
       }
       return Group.fromJson(response);
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to create group', e, st);
       rethrow;
     }
   }
@@ -97,13 +79,14 @@ class GroupService {
         data: {'joinCode': joinCode},
       );
 
-      final response = _unwrapResponse(rawResponse);
+      final response = ResponseUnwrapper.unwrapMap(rawResponse);
 
       if (response['group'] != null) {
         return Group.fromJson(response['group']);
       }
       return Group.fromJson(response);
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to join group', e, st);
       rethrow;
     }
   }
@@ -114,19 +97,13 @@ class GroupService {
         ApiEndpoints.groupBalances(groupId),
       );
 
-      Map<String, dynamic> response;
-      if (rawResponse is Map<String, dynamic>) {
-        response = _unwrapResponse(rawResponse);
-      } else {
-        return [];
-      }
-
-      List<dynamic> balancesList = response['balances'] ?? [];
+      final balancesList = ResponseUnwrapper.unwrapList(rawResponse, listKey: 'balances');
 
       return balancesList
           .map((json) => Balance.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to fetch balances for group $groupId', e, st);
       rethrow;
     }
   }
@@ -137,19 +114,13 @@ class GroupService {
         ApiEndpoints.groupExpenses(groupId),
       );
 
-      Map<String, dynamic> response;
-      if (rawResponse is Map<String, dynamic>) {
-        response = _unwrapResponse(rawResponse);
-      } else {
-        return [];
-      }
-
-      List<dynamic> expensesList = response['expenses'] ?? [];
+      final expensesList = ResponseUnwrapper.unwrapList(rawResponse, listKey: 'expenses');
 
       return expensesList
           .map((json) => Expense.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
+    } catch (e, st) {
+      _log.error('Failed to fetch expenses for group $groupId', e, st);
       rethrow;
     }
   }

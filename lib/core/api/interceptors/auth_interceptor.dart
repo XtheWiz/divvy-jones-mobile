@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import '../../storage/secure_storage.dart';
 import '../api_endpoints.dart';
@@ -5,7 +6,7 @@ import '../api_endpoints.dart';
 class AuthInterceptor extends Interceptor {
   final SecureStorage _storage;
   final Dio _dio;
-  bool _isRefreshing = false;
+  Completer<bool>? _refreshCompleter;
 
   AuthInterceptor({
     required SecureStorage storage,
@@ -34,32 +35,43 @@ class AuthInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401 && !_isAuthEndpoint(err.requestOptions.path)) {
-      if (_isRefreshing) {
-        return handler.next(err);
-      }
+      final refreshed = await _serializedRefresh();
+      if (refreshed) {
+        // Retry the original request with the new token
+        final token = await _storage.getAccessToken();
+        err.requestOptions.headers['Authorization'] = 'Bearer $token';
 
-      _isRefreshing = true;
-
-      try {
-        final refreshed = await _refreshToken();
-        if (refreshed) {
-          _isRefreshing = false;
-          // Retry the original request
-          final token = await _storage.getAccessToken();
-          err.requestOptions.headers['Authorization'] = 'Bearer $token';
-
+        try {
           final response = await _dio.fetch(err.requestOptions);
           return handler.resolve(response);
+        } on DioException catch (retryErr) {
+          return handler.next(retryErr);
         }
-      } catch (e) {
-        // Refresh failed, clear tokens
-        await _storage.clearTokens();
       }
-
-      _isRefreshing = false;
     }
 
     handler.next(err);
+  }
+
+  /// Ensures only one refresh happens at a time. Concurrent callers wait on
+  /// the same Completer and all receive the same result.
+  Future<bool> _serializedRefresh() async {
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+
+    _refreshCompleter = Completer<bool>();
+
+    try {
+      final result = await _refreshToken();
+      _refreshCompleter!.complete(result);
+      return result;
+    } catch (e) {
+      _refreshCompleter!.complete(false);
+      return false;
+    } finally {
+      _refreshCompleter = null;
+    }
   }
 
   Future<bool> _refreshToken() async {
@@ -69,7 +81,7 @@ class AuthInterceptor extends Interceptor {
     try {
       final response = await _dio.post(
         ApiEndpoints.refresh,
-        data: {'refresh_token': refreshToken},
+        data: {'refreshToken': refreshToken},
         options: Options(
           headers: {'Authorization': ''},
         ),
@@ -77,20 +89,30 @@ class AuthInterceptor extends Interceptor {
 
       if (response.statusCode == 200) {
         final data = response.data;
-        await _storage.setAccessToken(data['access_token']);
-        if (data['refresh_token'] != null) {
-          await _storage.setRefreshToken(data['refresh_token']);
+        // Unwrap {success, data} wrapper if present
+        final tokenData = data is Map<String, dynamic> && data['data'] != null
+            ? data['data'] as Map<String, dynamic>
+            : data as Map<String, dynamic>;
+
+        // Handle nested tokens structure or flat structure
+        final tokens = tokenData['tokens'] as Map<String, dynamic>? ?? tokenData;
+
+        if (tokens['accessToken'] != null) {
+          await _storage.setAccessToken(tokens['accessToken']);
         }
-        if (data['expires_in'] != null) {
+        if (tokens['refreshToken'] != null) {
+          await _storage.setRefreshToken(tokens['refreshToken']);
+        }
+        if (tokens['expiresIn'] != null) {
           final expiry = DateTime.now().add(
-            Duration(seconds: data['expires_in']),
+            Duration(seconds: tokens['expiresIn']),
           );
           await _storage.setTokenExpiry(expiry);
         }
         return true;
       }
     } catch (e) {
-      // Refresh failed
+      await _storage.clearTokens();
     }
 
     return false;

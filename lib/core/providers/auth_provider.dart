@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../api/api_exceptions.dart';
+import '../utils/app_logger.dart';
 
 enum AuthStatus {
   initial,
@@ -12,6 +13,7 @@ enum AuthStatus {
 }
 
 class AuthProvider with ChangeNotifier {
+  static const _log = AppLogger('AuthProvider');
   final AuthService _authService;
 
   AuthProvider({required AuthService authService}) : _authService = authService;
@@ -38,7 +40,8 @@ class AuthProvider with ChangeNotifier {
       } else {
         _status = AuthStatus.unauthenticated;
       }
-    } catch (e) {
+    } catch (e, st) {
+      _log.warning('Auth status check failed, treating as unauthenticated', e, st);
       _status = AuthStatus.unauthenticated;
     }
 
@@ -109,8 +112,8 @@ class AuthProvider with ChangeNotifier {
     try {
       _currentUser = await _authService.getCurrentUser();
       notifyListeners();
-    } catch (e) {
-      // Silently fail, user data will remain stale
+    } catch (e, st) {
+      _log.warning('Failed to refresh user profile, data may be stale', e, st);
     }
   }
 

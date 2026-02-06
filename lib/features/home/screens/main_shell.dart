@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/expense_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/category_icons.dart';
 import '../../../shared/widgets/bottom_nav_bar.dart';
 import '../../home/screens/home_screen.dart';
 import '../../groups/screens/groups_screen.dart';
@@ -149,7 +150,7 @@ class _ActivityScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              _getCategoryIcon(expense.category ?? 'other'),
+              CategoryIcons.fromCategory(expense.category ?? 'other'),
               color: isSettled ? AppColors.success : AppColors.warning,
               size: 22,
             ),
@@ -198,24 +199,4 @@ class _ActivityScreen extends StatelessWidget {
     );
   }
 
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-        return Icons.restaurant;
-      case 'transport':
-        return Icons.local_taxi;
-      case 'entertainment':
-        return Icons.movie;
-      case 'accommodation':
-        return Icons.hotel;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'health':
-        return Icons.medical_services;
-      case 'utilities':
-        return Icons.power;
-      default:
-        return Icons.receipt;
-    }
-  }
 }

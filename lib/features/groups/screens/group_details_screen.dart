@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/groups_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/category_icons.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_title_bar.dart';
 import '../../../shared/widgets/error_display.dart';
@@ -463,7 +464,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
           )
         else
           ...expenses.take(5).map((expense) => _buildExpenseItem(
-                icon: _getCategoryIcon(expense.category ?? 'other'),
+                icon: CategoryIcons.fromCategory(expense.category ?? 'other'),
                 title: expense.description,
                 paidBy: expense.paidByUser?.name ?? 'Someone',
                 amount: expense.formattedAmount,
@@ -471,27 +472,6 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
               )),
       ],
     );
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-        return Icons.restaurant;
-      case 'transport':
-        return Icons.local_taxi;
-      case 'entertainment':
-        return Icons.movie;
-      case 'accommodation':
-        return Icons.hotel;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'health':
-        return Icons.medical_services;
-      case 'utilities':
-        return Icons.power;
-      default:
-        return Icons.receipt;
-    }
   }
 
   Widget _buildExpenseItem({

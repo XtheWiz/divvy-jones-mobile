@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/group_service.dart';
 import '../api/api_exceptions.dart';
+import '../utils/app_logger.dart';
 
 enum GroupsStatus {
   initial,
@@ -11,6 +12,7 @@ enum GroupsStatus {
 }
 
 class GroupsProvider with ChangeNotifier {
+  static const _log = AppLogger('GroupsProvider');
   final GroupService _groupService;
 
   GroupsProvider({required GroupService groupService})
@@ -19,6 +21,9 @@ class GroupsProvider with ChangeNotifier {
   List<Group> _groups = [];
   GroupsStatus _status = GroupsStatus.initial;
   String? _error;
+
+  // Aggregated balances across all groups
+  final Map<String, List<Balance>> _balancesByGroup = {};
 
   // For single group details
   Group? _selectedGroup;
@@ -41,6 +46,31 @@ class GroupsProvider with ChangeNotifier {
         (sum, group) => sum + (group.totalExpenses ?? 0),
       );
 
+  /// Sum of all positive balances across groups (money owed to the user).
+  double get totalOwed {
+    double total = 0.0;
+    for (final balances in _balancesByGroup.values) {
+      for (final b in balances) {
+        if (b.balance > 0) total += b.balance;
+      }
+    }
+    return total;
+  }
+
+  /// Sum of all negative balances across groups (money the user owes).
+  double get totalOwing {
+    double total = 0.0;
+    for (final balances in _balancesByGroup.values) {
+      for (final b in balances) {
+        if (b.balance < 0) total += b.balance.abs();
+      }
+    }
+    return total;
+  }
+
+  /// Net balance across all groups.
+  double get netBalance => totalOwed - totalOwing;
+
   Future<void> loadGroups() async {
     _status = GroupsStatus.loading;
     _error = null;
@@ -49,6 +79,9 @@ class GroupsProvider with ChangeNotifier {
     try {
       _groups = await _groupService.getGroups();
       _status = GroupsStatus.loaded;
+
+      // Load balances for all groups in parallel
+      _loadAllBalances();
     } on ApiException catch (e) {
       _error = e.message;
       _status = GroupsStatus.error;
@@ -57,6 +90,23 @@ class GroupsProvider with ChangeNotifier {
       _status = GroupsStatus.error;
     }
 
+    notifyListeners();
+  }
+
+  /// Loads balances for all groups in parallel. Failures for individual groups
+  /// are silently ignored so the rest of the data remains available.
+  Future<void> _loadAllBalances() async {
+    final futures = <Future<void>>[];
+    for (final group in _groups) {
+      futures.add(
+        _groupService.getGroupBalances(group.id).then((balances) {
+          _balancesByGroup[group.id] = balances;
+        }).catchError((e, st) {
+          _log.warning('Failed to load balances for group ${group.id}', e, st);
+        }),
+      );
+    }
+    await Future.wait(futures);
     notifyListeners();
   }
 
@@ -75,6 +125,9 @@ class GroupsProvider with ChangeNotifier {
       _selectedGroup = results[0] as Group;
       _selectedGroupBalances = results[1] as List<Balance>;
       _selectedGroupExpenses = results[2] as List<Expense>;
+
+      // Also update the aggregated balances cache
+      _balancesByGroup[groupId] = _selectedGroupBalances;
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {

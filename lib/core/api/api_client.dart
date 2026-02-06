@@ -3,9 +3,12 @@ import 'api_endpoints.dart';
 import 'api_exceptions.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
+import '../constants/app_config.dart';
 import '../storage/secure_storage.dart';
+import '../utils/app_logger.dart';
 
 class ApiClient {
+  static const _log = AppLogger('ApiClient');
   late final Dio _dio;
   final SecureStorage _storage;
 
@@ -26,12 +29,13 @@ class ApiClient {
     _dio.interceptors.addAll([
       AuthInterceptor(storage: _storage, dio: _dio),
       ErrorInterceptor(),
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        error: true,
-        logPrint: (obj) => print('[API] $obj'),
-      ),
+      if (!AppConfig.isProduction)
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          error: true,
+          logPrint: (obj) => _log.debug(obj.toString()),
+        ),
     ]);
   }
 
