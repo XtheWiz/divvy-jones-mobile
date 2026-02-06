@@ -54,7 +54,7 @@ class ApiClient {
       if (fromJson != null) {
         return fromJson(response.data);
       }
-      return response.data as T;
+      return _safeCast<T>(response.data);
     } on DioException catch (e) {
       throw _extractException(e);
     }
@@ -75,7 +75,7 @@ class ApiClient {
       if (fromJson != null) {
         return fromJson(response.data);
       }
-      return response.data as T;
+      return _safeCast<T>(response.data);
     } on DioException catch (e) {
       throw _extractException(e);
     }
@@ -96,7 +96,7 @@ class ApiClient {
       if (fromJson != null) {
         return fromJson(response.data);
       }
-      return response.data as T;
+      return _safeCast<T>(response.data);
     } on DioException catch (e) {
       throw _extractException(e);
     }
@@ -117,10 +117,17 @@ class ApiClient {
       if (fromJson != null) {
         return fromJson(response.data);
       }
-      return response.data as T;
+      return _safeCast<T>(response.data);
     } on DioException catch (e) {
       throw _extractException(e);
     }
+  }
+
+  T _safeCast<T>(dynamic data) {
+    if (data is T) return data;
+    throw ApiException(
+      message: 'Unexpected response format from server.',
+    );
   }
 
   ApiException _extractException(DioException e) {

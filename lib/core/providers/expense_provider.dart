@@ -14,6 +14,7 @@ enum ExpenseStatus {
 
 class ExpenseProvider with ChangeNotifier {
   static const _log = AppLogger('ExpenseProvider');
+  static const int _pageSize = 20;
   final ExpenseService _expenseService;
 
   ExpenseProvider({required ExpenseService expenseService})
@@ -24,6 +25,11 @@ class ExpenseProvider with ChangeNotifier {
   String? _error;
   List<Expense> _recentActivity = [];
 
+  // Pagination state per group
+  final Map<String, int> _currentPageByGroup = {};
+  final Map<String, bool> _hasMoreByGroup = {};
+  bool _isLoadingMore = false;
+
   List<Expense> getExpensesForGroup(String groupId) =>
       _expensesByGroup[groupId] ?? [];
 
@@ -31,16 +37,26 @@ class ExpenseProvider with ChangeNotifier {
   String? get error => _error;
   bool get isLoading => _status == ExpenseStatus.loading;
   bool get isCreating => _status == ExpenseStatus.creating;
+  bool get isLoadingMore => _isLoadingMore;
   List<Expense> get recentActivity => _recentActivity;
+
+  bool hasMoreExpenses(String groupId) => _hasMoreByGroup[groupId] ?? true;
 
   Future<void> loadGroupExpenses(String groupId) async {
     _status = ExpenseStatus.loading;
     _error = null;
+    _currentPageByGroup[groupId] = 1;
+    _hasMoreByGroup[groupId] = true;
     notifyListeners();
 
     try {
-      final expenses = await _expenseService.getGroupExpenses(groupId);
+      final expenses = await _expenseService.getGroupExpenses(
+        groupId,
+        page: 1,
+        limit: _pageSize,
+      );
       _expensesByGroup[groupId] = expenses;
+      _hasMoreByGroup[groupId] = expenses.length >= _pageSize;
       _status = ExpenseStatus.loaded;
 
       // Update recent activity (combine all groups, sort by date, take first 5)
@@ -54,6 +70,38 @@ class ExpenseProvider with ChangeNotifier {
       _status = ExpenseStatus.error;
     }
 
+    notifyListeners();
+  }
+
+  Future<void> loadMoreGroupExpenses(String groupId) async {
+    if (_isLoadingMore || !(_hasMoreByGroup[groupId] ?? false)) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final nextPage = (_currentPageByGroup[groupId] ?? 1) + 1;
+      final newExpenses = await _expenseService.getGroupExpenses(
+        groupId,
+        page: nextPage,
+        limit: _pageSize,
+      );
+
+      final existing = _expensesByGroup[groupId] ?? [];
+      existing.addAll(newExpenses);
+      _expensesByGroup[groupId] = existing;
+      _currentPageByGroup[groupId] = nextPage;
+      _hasMoreByGroup[groupId] = newExpenses.length >= _pageSize;
+
+      _updateRecentActivity();
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e, st) {
+      _log.error('Failed to load more expenses for group $groupId', e, st);
+      _error = 'Failed to load more expenses.';
+    }
+
+    _isLoadingMore = false;
     notifyListeners();
   }
 

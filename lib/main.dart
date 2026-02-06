@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app.dart';
@@ -7,9 +8,28 @@ import 'core/services/auth_service.dart';
 import 'core/services/group_service.dart';
 import 'core/services/expense_service.dart';
 import 'core/providers/providers.dart';
+import 'core/utils/app_logger.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  const log = AppLogger('Main');
+
+  // Catch Flutter framework errors (widget build, layout, painting)
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    log.error(
+      'Flutter framework error: ${details.exceptionAsString()}',
+      details.exception,
+      details.stack,
+    );
+  };
+
+  // Catch unhandled async errors and platform errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    log.error('Unhandled platform error', error, stack);
+    return true;
+  };
 
   // Initialize core dependencies
   final secureStorage = SecureStorage();

@@ -10,10 +10,11 @@ class ExpenseService {
 
   ExpenseService({required ApiClient apiClient}) : _apiClient = apiClient;
 
-  Future<List<Expense>> getGroupExpenses(String groupId) async {
+  Future<List<Expense>> getGroupExpenses(String groupId, {int page = 1, int limit = 20}) async {
     try {
       final rawResponse = await _apiClient.get<dynamic>(
         ApiEndpoints.groupExpenses(groupId),
+        queryParameters: {'page': page, 'limit': limit},
       );
 
       final expensesList = ResponseUnwrapper.unwrapList(rawResponse, listKey: 'expenses');

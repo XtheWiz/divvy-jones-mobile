@@ -10,9 +10,12 @@ class GroupService {
 
   GroupService({required ApiClient apiClient}) : _apiClient = apiClient;
 
-  Future<List<Group>> getGroups() async {
+  Future<List<Group>> getGroups({int page = 1, int limit = 20}) async {
     try {
-      final rawResponse = await _apiClient.get<dynamic>(ApiEndpoints.groups);
+      final rawResponse = await _apiClient.get<dynamic>(
+        ApiEndpoints.groups,
+        queryParameters: {'page': page, 'limit': limit},
+      );
       final groupsList = ResponseUnwrapper.unwrapList(rawResponse, listKey: 'groups');
 
       return groupsList
@@ -108,10 +111,11 @@ class GroupService {
     }
   }
 
-  Future<List<Expense>> getGroupExpenses(String groupId) async {
+  Future<List<Expense>> getGroupExpenses(String groupId, {int page = 1, int limit = 20}) async {
     try {
       final rawResponse = await _apiClient.get<dynamic>(
         ApiEndpoints.groupExpenses(groupId),
+        queryParameters: {'page': page, 'limit': limit},
       );
 
       final expensesList = ResponseUnwrapper.unwrapList(rawResponse, listKey: 'expenses');

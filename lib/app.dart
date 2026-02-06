@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/auth_provider.dart';
+import 'shared/widgets/error_boundary.dart';
 import 'features/auth/screens/sign_in_screen.dart';
 import 'features/auth/screens/sign_up_screen.dart';
 import 'features/home/screens/main_shell.dart';
@@ -157,11 +158,13 @@ class _DivvyJonesAppState extends State<DivvyJonesApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Divvy Jones',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      routerConfig: _router,
+    return ErrorBoundary(
+      child: MaterialApp.router(
+        title: 'Divvy Jones',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        routerConfig: _router,
+      ),
     );
   }
 }

@@ -72,17 +72,32 @@ class _GroupsScreenState extends State<GroupsScreen> {
                     return RefreshIndicator(
                       onRefresh: _loadGroups,
                       color: AppColors.primaryPurple,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 25),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 16),
-                            _buildSearchBar(context),
-                            const SizedBox(height: 24),
-                            ...groups.map(
-                              (group) => Padding(
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification is ScrollEndNotification &&
+                              notification.metrics.extentAfter < 200 &&
+                              groupsProvider.hasMoreGroups &&
+                              !groupsProvider.isLoadingMore) {
+                            groupsProvider.loadMoreGroups();
+                          }
+                          return false;
+                        },
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 25),
+                          // +3 for: search bar, loading indicator, bottom spacer
+                          itemCount: groups.length + 3,
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 16, bottom: 24),
+                                child: _buildSearchBar(context),
+                              );
+                            }
+                            final groupIndex = index - 1;
+                            if (groupIndex < groups.length) {
+                              final group = groups[groupIndex];
+                              return Padding(
                                 padding: const EdgeInsets.only(bottom: 16),
                                 child: _buildGroupCard(
                                   context: context,
@@ -96,10 +111,27 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                           .toList() ??
                                       [],
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 100),
-                          ],
+                              );
+                            }
+                            if (groupIndex == groups.length) {
+                              // Loading indicator
+                              if (groupsProvider.isLoadingMore) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.primaryPurple,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            }
+                            // Bottom spacer
+                            return const SizedBox(height: 100);
+                          },
                         ),
                       ),
                     );

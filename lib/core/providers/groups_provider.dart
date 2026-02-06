@@ -18,9 +18,14 @@ class GroupsProvider with ChangeNotifier {
   GroupsProvider({required GroupService groupService})
       : _groupService = groupService;
 
+  static const int _pageSize = 20;
+
   List<Group> _groups = [];
   GroupsStatus _status = GroupsStatus.initial;
   String? _error;
+  int _currentPage = 1;
+  bool _hasMoreGroups = true;
+  bool _isLoadingMore = false;
 
   // Aggregated balances across all groups
   final Map<String, List<Balance>> _balancesByGroup = {};
@@ -35,6 +40,8 @@ class GroupsProvider with ChangeNotifier {
   GroupsStatus get status => _status;
   String? get error => _error;
   bool get isLoading => _status == GroupsStatus.loading;
+  bool get hasMoreGroups => _hasMoreGroups;
+  bool get isLoadingMore => _isLoadingMore;
 
   Group? get selectedGroup => _selectedGroup;
   List<Balance> get selectedGroupBalances => _selectedGroupBalances;
@@ -74,10 +81,14 @@ class GroupsProvider with ChangeNotifier {
   Future<void> loadGroups() async {
     _status = GroupsStatus.loading;
     _error = null;
+    _currentPage = 1;
+    _hasMoreGroups = true;
     notifyListeners();
 
     try {
-      _groups = await _groupService.getGroups();
+      final groups = await _groupService.getGroups(page: 1, limit: _pageSize);
+      _groups = groups;
+      _hasMoreGroups = groups.length >= _pageSize;
       _status = GroupsStatus.loaded;
 
       // Load balances for all groups in parallel
@@ -90,6 +101,28 @@ class GroupsProvider with ChangeNotifier {
       _status = GroupsStatus.error;
     }
 
+    notifyListeners();
+  }
+
+  Future<void> loadMoreGroups() async {
+    if (_isLoadingMore || !_hasMoreGroups) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final nextPage = _currentPage + 1;
+      final newGroups = await _groupService.getGroups(page: nextPage, limit: _pageSize);
+      _groups.addAll(newGroups);
+      _currentPage = nextPage;
+      _hasMoreGroups = newGroups.length >= _pageSize;
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e) {
+      _error = 'Failed to load more groups.';
+    }
+
+    _isLoadingMore = false;
     notifyListeners();
   }
 
