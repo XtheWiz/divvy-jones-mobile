@@ -139,6 +139,29 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (groupsProvider.hasBalanceErrors)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Some balance data unavailable',
+                            style: AppTypography.caption.copyWith(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Text(
                 'Net Balance',
                 style: AppTypography.bodyMedium.copyWith(

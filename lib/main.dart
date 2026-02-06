@@ -9,6 +9,7 @@ import 'core/services/group_service.dart';
 import 'core/services/expense_service.dart';
 import 'core/providers/providers.dart';
 import 'core/utils/app_logger.dart';
+import 'shared/widgets/error_boundary.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,8 @@ void main() {
       details.exception,
       details.stack,
     );
+    // Signal the ErrorBoundary to show fallback UI
+    fatalErrorNotifier.value = true;
   };
 
   // Catch unhandled async errors and platform errors

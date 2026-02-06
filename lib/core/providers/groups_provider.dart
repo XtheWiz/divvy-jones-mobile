@@ -29,6 +29,7 @@ class GroupsProvider with ChangeNotifier {
 
   // Aggregated balances across all groups
   final Map<String, List<Balance>> _balancesByGroup = {};
+  final Set<String> _failedBalanceGroups = {};
 
   // For single group details
   Group? _selectedGroup;
@@ -42,6 +43,7 @@ class GroupsProvider with ChangeNotifier {
   bool get isLoading => _status == GroupsStatus.loading;
   bool get hasMoreGroups => _hasMoreGroups;
   bool get isLoadingMore => _isLoadingMore;
+  bool get hasBalanceErrors => _failedBalanceGroups.isNotEmpty;
 
   Group? get selectedGroup => _selectedGroup;
   List<Balance> get selectedGroupBalances => _selectedGroupBalances;
@@ -129,6 +131,7 @@ class GroupsProvider with ChangeNotifier {
   /// Loads balances for all groups in parallel. Failures for individual groups
   /// are silently ignored so the rest of the data remains available.
   Future<void> _loadAllBalances() async {
+    _failedBalanceGroups.clear();
     final futures = <Future<void>>[];
     for (final group in _groups) {
       futures.add(
@@ -136,6 +139,7 @@ class GroupsProvider with ChangeNotifier {
           _balancesByGroup[group.id] = balances;
         }).catchError((e, st) {
           _log.warning('Failed to load balances for group ${group.id}', e, st);
+          _failedBalanceGroups.add(group.id);
         }),
       );
     }
