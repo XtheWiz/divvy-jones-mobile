@@ -117,8 +117,8 @@ class ExpenseProvider with ChangeNotifier {
   void _updateRecentActivity() {
     final allExpenses = _expensesByGroup.values.expand((list) => list).toList();
     allExpenses.sort((a, b) {
-      final aDate = a.createdAt ?? DateTime.now();
-      final bDate = b.createdAt ?? DateTime.now();
+      final aDate = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return bDate.compareTo(aDate);
     });
     _recentActivity = allExpenses.take(5).toList();

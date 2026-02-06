@@ -22,7 +22,7 @@ class Balance {
 
   bool get isOwed => balance > 0;
   bool get owes => balance < 0;
-  bool get isSettled => balance == 0;
+  bool get isSettled => balance.abs() < 0.01;
 
   String get formattedBalance {
     final absBalance = balance.abs();

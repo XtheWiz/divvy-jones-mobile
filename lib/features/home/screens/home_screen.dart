@@ -29,11 +29,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final groupsProvider = context.read<GroupsProvider>();
     await groupsProvider.loadGroups();
 
-    // Load expenses for all groups
+    // Load expenses for all groups in parallel
     final expenseProvider = context.read<ExpenseProvider>();
-    for (final group in groupsProvider.groups) {
-      await expenseProvider.loadGroupExpenses(group.id);
-    }
+    await Future.wait(
+      groupsProvider.groups.map((g) => expenseProvider.loadGroupExpenses(g.id)),
+    );
   }
 
   @override
